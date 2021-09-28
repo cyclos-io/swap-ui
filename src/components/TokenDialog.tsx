@@ -11,11 +11,15 @@ import {
   List,
   ListItem,
   Typography,
+  Chip,
+  Avatar,
   Tabs,
   Tab,
+  Grid,
 } from "@material-ui/core";
+import { StarOutline, Star } from "@material-ui/icons";
 import { TokenIcon } from "./Swap";
-import { useSwappableTokens } from "../context/TokenList";
+import { useSwappableTokens, useTokenBase } from "../context/TokenList";
 import { useMediaQuery } from "@material-ui/core";
 
 const useStyles = makeStyles((theme) => ({
@@ -37,6 +41,24 @@ const useStyles = makeStyles((theme) => ({
   tabIndicator: {
     opacity: 0,
   },
+  chip: {
+    marginRight: theme.spacing(0.4),
+    marginBottom: theme.spacing(0.5),
+  },
+  selectTokenTitle: {
+    paddingBottom: theme.spacing(1.8),
+  },
+  commonBasesTitle: {
+    paddingTop: theme.spacing(0.5),
+    paddingBottom: theme.spacing(0.4),
+  },
+  tokenSelector: {
+    paddingTop: theme.spacing(1),
+    paddingLeft: theme.spacing(0.5),
+    display: "flex",
+    width: "100%",
+    cursor: "pointer",
+  },
 }));
 
 export default function TokenDialog({
@@ -54,6 +76,7 @@ export default function TokenDialog({
   const styles = useStyles();
   const { swappableTokens, swappableTokensSollet, swappableTokensWormhole } =
     useSwappableTokens();
+  const { tokenBase, addNewBase, tokenBaseMap, removeBase } = useTokenBase();
   const displayTabs = !useMediaQuery("(max-width:450px)");
   const selectedTokens =
     tabSelection === 0
@@ -83,9 +106,10 @@ export default function TokenDialog({
       }}
     >
       <DialogTitle style={{ fontWeight: "bold" }}>
-        <Typography variant="h6" style={{ paddingBottom: "16px" }}>
+        <Typography variant="h6" className={styles.selectTokenTitle}>
           Select a token
         </Typography>
+        {/* Token search */}
         <TextField
           className={styles.textField}
           placeholder={"Search name"}
@@ -94,6 +118,20 @@ export default function TokenDialog({
           variant="outlined"
           onChange={(e) => setTokenFilter(e.target.value)}
         />
+
+        <Typography variant="subtitle2" className={styles.commonBasesTitle}>
+          Common bases
+        </Typography>
+        {/* Common token */}
+        {tokenBase?.length != 0 && (
+          <CommonBases
+            commonTokenBases={tokenBase}
+            onClick={(mint) => {
+              setMint(mint);
+              onClose();
+            }}
+          />
+        )}
       </DialogTitle>
       <DialogContent className={styles.dialogContent} dividers={true}>
         <List disablePadding>
@@ -104,6 +142,15 @@ export default function TokenDialog({
               onClick={(mint) => {
                 setMint(mint);
                 onClose();
+              }}
+              addNewBase={(token) => {
+                addNewBase(token);
+              }}
+              isCommonBase={
+                tokenBaseMap.get(tokenInfo.address.toString()) ? true : false
+              }
+              removeBase={(token) => {
+                removeBase(token);
               }}
             />
           ))}
@@ -146,19 +193,35 @@ export default function TokenDialog({
 function TokenListItem({
   tokenInfo,
   onClick,
+  addNewBase,
+  removeBase,
+  isCommonBase,
 }: {
   tokenInfo: TokenInfo;
   onClick: (mint: PublicKey) => void;
+  addNewBase: (token: TokenInfo) => void;
+  removeBase: (token: TokenInfo) => void;
+  isCommonBase: Boolean;
 }) {
+  const styles = useStyles();
   const mint = new PublicKey(tokenInfo.address);
+
   return (
-    <ListItem
-      button
-      onClick={() => onClick(mint)}
-      style={{ padding: "10px 20px" }}
-    >
-      <TokenIcon mint={mint} style={{ width: "30px", borderRadius: "15px" }} />
-      <TokenName tokenInfo={tokenInfo} />
+    <ListItem button>
+      <div onClick={() => onClick(mint)} className={styles.tokenSelector}>
+        <TokenIcon
+          mint={mint}
+          style={{ width: "30px", borderRadius: "15px" }}
+        />
+        <TokenName tokenInfo={tokenInfo} />
+      </div>
+      <Chip
+        variant="outlined"
+        label={isCommonBase ? <Star /> : <StarOutline />}
+        onClick={() =>
+          isCommonBase ? removeBase(tokenInfo) : addNewBase(tokenInfo)
+        }
+      />
     </ListItem>
   );
 }
@@ -173,5 +236,32 @@ function TokenName({ tokenInfo }: { tokenInfo: TokenInfo }) {
         {tokenInfo?.name}
       </Typography>
     </div>
+  );
+}
+
+function CommonBases({
+  commonTokenBases,
+  onClick,
+}: {
+  commonTokenBases: TokenInfo[] | undefined;
+  onClick: (mint: PublicKey) => void;
+}) {
+  const styles = useStyles();
+  return (
+    <Grid container>
+      {commonTokenBases?.map((tokenInfo: TokenInfo) => {
+        const mint = new PublicKey(tokenInfo.address);
+        return (
+          <Chip
+            key={tokenInfo.address}
+            avatar={<Avatar alt={tokenInfo?.name} src={tokenInfo?.logoURI} />}
+            variant="outlined"
+            label={tokenInfo?.symbol}
+            onClick={() => onClick(mint)}
+            className={styles.chip}
+          />
+        );
+      })}
+    </Grid>
   );
 }

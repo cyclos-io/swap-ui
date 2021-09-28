@@ -39,7 +39,6 @@ export function InfoLabel() {
   const { fromMint, toMint, showReversePrices, setShowReversePrices } =
     useSwapContext();
   const fromMintInfo = useMint(fromMint);
-  const toMintInfo = useMint(toMint);
   const fair = getSwapFair(showReversePrices);
 
   const tokenMap = useTokenMap();
@@ -61,7 +60,6 @@ export function InfoLabel() {
           <SwapHorizRounded />
         </IconButton>
         &nbsp;
-
         <Typography color="textSecondary" style={{ fontSize: "14px" }}>
           {fair !== undefined && toTokenInfo && fromTokenInfo
             ? `1 ${toTokenInfo.symbol} = ${fair.toFixed(
