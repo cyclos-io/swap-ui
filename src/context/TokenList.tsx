@@ -1,6 +1,8 @@
 import React, { useContext, useMemo } from "react";
 import { TokenInfo } from "@solana/spl-token-registry";
 import { SOL_MINT } from "../utils/pubkeys";
+import { PublicKey } from "@solana/web3.js";
+import { getUserTokens, OwnedTokenDetailed } from "../utils/userTokens";
 
 type TokenListContext = {
   tokenMap: Map<string, TokenInfo>;
@@ -9,6 +11,7 @@ type TokenListContext = {
   swappableTokens: TokenInfo[];
   swappableTokensSollet: TokenInfo[];
   swappableTokensWormhole: TokenInfo[];
+  ownedTokensDetailed: OwnedTokenDetailed[];
 };
 const _TokenListContext = React.createContext<null | TokenListContext>(null);
 
@@ -45,6 +48,8 @@ export function TokenListContextProvider(props: any) {
     return list;
   }, [props.tokenList]);
 
+  const pk: PublicKey | undefined = props?.provider?.wallet?.publicKey;
+
   // Token map for quick lookup.
   const tokenMap = useMemo(() => {
     const tokenMap = new Map();
@@ -54,18 +59,36 @@ export function TokenListContextProvider(props: any) {
     return tokenMap;
   }, [tokenList]);
 
+  const ownedTokensDetailed = useMemo(() => getUserTokens(pk), [pk]);
+
   // Tokens with USD(x) quoted markets.
   const swappableTokens = useMemo(() => {
-    const tokens = tokenList.filter((t: TokenInfo) => {
+    const allTokens = tokenList.filter((t: TokenInfo) => {
       const isUsdxQuoted =
         t.extensions?.serumV3Usdt || t.extensions?.serumV3Usdc;
       return isUsdxQuoted;
     });
-    tokens.sort((a: TokenInfo, b: TokenInfo) =>
+
+    const ownedTokensList = ownedTokensDetailed.map((t) => t.address);
+
+    // Partition allTokens (pass & fail reduce)
+    const [ownedTokens, notOwnedtokens] = allTokens.reduce(
+      ([p, f]: [TokenInfo[], TokenInfo[]], t: TokenInfo) =>
+        // pass & fail condition
+        ownedTokensList.includes(t.address) ? [[...p, t], f] : [p, [...f, t]],
+      [[], []]
+    );
+
+    notOwnedtokens.sort((a: TokenInfo, b: TokenInfo) =>
       a.symbol < b.symbol ? -1 : a.symbol > b.symbol ? 1 : 0
     );
+    ownedTokens.sort(
+      (a: TokenInfo, b: TokenInfo) => b.address.length - a.address.length
+    );
+    const tokens = ownedTokens.concat(notOwnedtokens);
+
     return tokens;
-  }, [tokenList, tokenMap]);
+  }, [tokenList, tokenMap, pk]);
 
   // Sollet wrapped tokens.
   const [swappableTokensSollet, solletMap] = useMemo(() => {
@@ -106,6 +129,7 @@ export function TokenListContextProvider(props: any) {
         swappableTokens,
         swappableTokensWormhole,
         swappableTokensSollet,
+        ownedTokensDetailed,
       }}
     >
       {props.children}
