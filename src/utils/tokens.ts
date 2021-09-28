@@ -91,3 +91,31 @@ function getOwnedAccountsFilters(publicKey: PublicKey) {
     },
   ];
 }
+
+/**
+ * Get associated token account for given mint, and instruction
+ * to generate this account
+ * @param mint
+ * @returns
+ */
+export async function getTokenAddrressAndCreateIx(
+  mint: PublicKey,
+  wallet: PublicKey
+) {
+  const tokenAddress = await Token.getAssociatedTokenAddress(
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+    TOKEN_PROGRAM_ID,
+    mint,
+    wallet
+  );
+
+  const createTokenAddrIx = Token.createAssociatedTokenAccountInstruction(
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+    TOKEN_PROGRAM_ID,
+    mint,
+    tokenAddress,
+    wallet,
+    wallet
+  );
+  return { tokenAddress, createTokenAddrIx };
+}

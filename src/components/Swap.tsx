@@ -5,8 +5,16 @@ import {
   Transaction,
   SystemProgram,
   Signer,
+  SYSVAR_RENT_PUBKEY,
+  TransactionInstruction,
 } from "@solana/web3.js";
-import { Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import {
+  u64,
+  Token,
+  TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
+import { OpenOrders } from "@project-serum/serum";
 import { BN, Provider } from "@project-serum/anchor";
 import {
   makeStyles,
@@ -17,21 +25,41 @@ import {
   useTheme,
 } from "@material-ui/core";
 import { ExpandMore, ImportExportRounded } from "@material-ui/icons";
-import { useSwapContext, useSwapFair } from "../context/Swap";
+import {
+  useIsUnwrapSollet,
+  useCanCreateAccounts,
+  useCanWrapOrUnwrap,
+  useSwapContext,
+  useSwapFair,
+} from "../context/Swap";
+// import { useIsUnwrapSolletUsdt, useSwapContext, useSwapFair } from "../context/Swap";
 import {
   useDexContext,
-  useOpenOrders,
   useRouteVerbose,
   useMarket,
   FEE_MULTIPLIER,
+  _DexContext,
 } from "../context/Dex";
 import { useTokenMap } from "../context/TokenList";
-import { useMint, useOwnedTokenAccount } from "../context/Token";
-import { useCanSwap, useReferral } from "../context/Swap";
+import {
+  addTokensToCache,
+  CachedToken,
+  useMint,
+  useOwnedTokenAccount,
+  useTokenContext,
+} from "../context/Token";
+import { useCanSwap, useReferral, useIsWrapSol } from "../context/Swap";
 import TokenDialog from "./TokenDialog";
 import { SettingsButton } from "./Settings";
 import { InfoLabel } from "./Info";
-import { SOL_MINT, WRAPPED_SOL_MINT } from "../utils/pubkeys";
+import {
+  SOL_MINT,
+  WRAPPED_SOL_MINT,
+  DEX_PID,
+  MEMO_PROGRAM_ID,
+  SOLLET_USDT_MINT,
+} from "../utils/pubkeys";
+import { getTokenAddrressAndCreateIx } from "../utils/tokens";
 
 const useStyles = makeStyles((theme) => ({
   card: {
@@ -310,7 +338,6 @@ function TokenName({ mint, style }: { mint: PublicKey; style: any }) {
   const tokenMap = useTokenMap();
   const theme = useTheme();
   let tokenInfo = tokenMap.get(mint.toString());
-
   return (
     <Typography
       style={{
@@ -334,27 +361,366 @@ export function SwapButton() {
     isClosingNewAccounts,
     isStrict,
   } = useSwapContext();
-  const { swapClient } = useDexContext();
+  const {
+    swapClient,
+    isLoaded: isDexLoaded,
+    addOpenOrderAccount,
+    openOrders,
+  } = useDexContext();
+  const { isLoaded: isTokensLoaded, refreshTokenState } = useTokenContext();
+
+  // Token to be traded away
   const fromMintInfo = useMint(fromMint);
+  // End destination token
   const toMintInfo = useMint(toMint);
-  const openOrders = useOpenOrders();
+
   const route = useRouteVerbose(fromMint, toMint);
   const fromMarket = useMarket(
     route && route.markets ? route.markets[0] : undefined
   );
+
   const toMarket = useMarket(
     route && route.markets ? route.markets[1] : undefined
   );
-  const canSwap = useCanSwap();
-  const referral = useReferral(fromMarket);
-  const fair = useSwapFair();
-  let fromWallet = useOwnedTokenAccount(fromMint);
-  let toWallet = useOwnedTokenAccount(toMint);
+
+  const toWallet = useOwnedTokenAccount(toMint);
+  const fromWallet = useOwnedTokenAccount(fromMint);
+
+  // Intermediary token for multi-market swaps, eg. USDC in a SRM -> BTC swap
   const quoteMint = fromMarket && fromMarket.quoteMintAddress;
   const quoteMintInfo = useMint(quoteMint);
   const quoteWallet = useOwnedTokenAccount(quoteMint);
 
-  // Click handler.
+  const canCreateAccounts = useCanCreateAccounts();
+  const canWrapOrUnwrap = useCanWrapOrUnwrap();
+  const canSwap = useCanSwap();
+  const referral = useReferral(fromMarket);
+  const fair = useSwapFair();
+
+  const { isWrapSol, isUnwrapSol } = useIsWrapSol(fromMint, toMint);
+  const isUnwrapSollet = useIsUnwrapSollet(fromMint, toMint);
+
+  const fromOpenOrders = useMemo(() => {
+    return fromMarket
+      ? openOrders.get(fromMarket?.address.toString())
+      : undefined;
+  }, [fromMarket, openOrders]);
+
+  const toOpenOrders = useMemo(() => {
+    return toMarket ? openOrders.get(toMarket?.address.toString()) : undefined;
+  }, [toMarket, openOrders]);
+
+  const disconnected = !swapClient.program.provider.wallet.publicKey;
+
+  const insufficientBalance =
+    fromAmount == 0 ||
+    fromAmount * Math.pow(10, fromMintInfo?.decimals ?? 0) >
+      (fromWallet?.account.amount.toNumber() ?? 0);
+
+  const needsCreateAccounts =
+    !toWallet ||
+    (!isUnwrapSollet && (!fromOpenOrders || (toMarket && !toOpenOrders)));
+
+  // Click handlers.
+
+  /**
+   * Find if OpenOrders or associated token accounts are required
+   * for the swap, then send a create transaction
+   */
+  const sendCreateAccountsTransaction = async () => {
+    if (!fromMintInfo || !toMintInfo) {
+      throw new Error("Unable to calculate mint decimals");
+    }
+    if (!quoteMint || !quoteMintInfo) {
+      throw new Error("Quote mint not found");
+    }
+    const tx = new Transaction();
+    const signers = [];
+
+    let toAssociatedPubkey!: PublicKey;
+    let quoteAssociatedPubkey!: PublicKey;
+
+    // Associated token account creation
+    if (!toWallet) {
+      const { tokenAddress, createTokenAddrIx } =
+        await getTokenAddrressAndCreateIx(
+          toMint,
+          swapClient.program.provider.wallet.publicKey
+        );
+      toAssociatedPubkey = tokenAddress;
+      tx.add(createTokenAddrIx);
+    }
+
+    if (!quoteWallet && !quoteMint.equals(toMint)) {
+      const { tokenAddress, createTokenAddrIx } =
+        await getTokenAddrressAndCreateIx(
+          quoteMint,
+          swapClient.program.provider.wallet.publicKey
+        );
+      quoteAssociatedPubkey = tokenAddress;
+      tx.add(createTokenAddrIx);
+    }
+    // No point of initializing from wallet, as user won't have tokens there
+
+    // Helper functions for OpenOrders
+
+    /**
+     * Add instructions to init and create an OpenOrders account
+     * @param openOrdersKeypair
+     * @param market
+     * @param tx
+     */
+    async function getInitOpenOrdersIx(
+      openOrdersKeypair: Keypair,
+      market: PublicKey,
+      tx: Transaction
+    ) {
+      const createOoIx = await OpenOrders.makeCreateAccountTransaction(
+        swapClient.program.provider.connection,
+        market,
+        swapClient.program.provider.wallet.publicKey,
+        openOrdersKeypair.publicKey,
+        DEX_PID
+      );
+      const initAcIx = swapClient.program.instruction.initAccount({
+        accounts: {
+          openOrders: openOrdersKeypair.publicKey,
+          authority: swapClient.program.provider.wallet.publicKey,
+          market: market,
+          dexProgram: DEX_PID,
+          rent: SYSVAR_RENT_PUBKEY,
+        },
+      });
+      tx.add(createOoIx);
+      tx.add(initAcIx);
+    }
+
+    /**
+     * Save data of newly created OpenOrders account in cache
+     * TODO: generate object client side to save a network call
+     * @param openOrdersAddress
+     */
+    async function saveOpenOrders(openOrdersAddress: PublicKey) {
+      const generatedOpenOrders = await OpenOrders.load(
+        swapClient.program.provider.connection,
+        openOrdersAddress,
+        DEX_PID
+      );
+      addOpenOrderAccount(generatedOpenOrders.market, generatedOpenOrders);
+    }
+
+    // Open order accounts for to / from wallets. Generate if not already present
+    let ooFrom!: Keypair;
+    let ooTo!: Keypair;
+    if (fromMarket && !fromOpenOrders) {
+      ooFrom = Keypair.generate();
+      await getInitOpenOrdersIx(ooFrom, fromMarket.address, tx);
+      signers.push(ooFrom);
+    }
+    if (toMarket && !toOpenOrders) {
+      ooTo = Keypair.generate();
+      await getInitOpenOrdersIx(ooTo, toMarket.address, tx);
+      signers.push(ooTo);
+    }
+
+    try {
+      // Send transaction to create accounts
+      await swapClient.program.provider.send(tx, signers);
+
+      // Save OpenOrders to cache
+      if (ooFrom) {
+        await saveOpenOrders(ooFrom.publicKey);
+      }
+      if (ooTo) {
+        await saveOpenOrders(ooTo.publicKey);
+      }
+
+      // Save created associated token accounts to cache
+      const tokensToAdd: CachedToken[] = [];
+      if (toAssociatedPubkey) {
+        tokensToAdd.push(
+          getNewTokenAccountData(
+            toAssociatedPubkey,
+            toMint,
+            swapClient.program.provider.wallet.publicKey
+          )
+        );
+      }
+      if (quoteAssociatedPubkey && !quoteMint.equals(toMint)) {
+        tokensToAdd.push(
+          getNewTokenAccountData(
+            quoteAssociatedPubkey,
+            quoteMint,
+            swapClient.program.provider.wallet.publicKey
+          )
+        );
+      }
+      addTokensToCache(tokensToAdd);
+
+      // Refresh UI to display balance of the created token account
+      refreshTokenState();
+    } catch (error) {}
+  };
+
+  const sendWrapSolTransaction = async () => {
+    if (!fromMintInfo || !toMintInfo) {
+      throw new Error("Unable to calculate mint decimals");
+    }
+    if (!quoteMint || !quoteMintInfo) {
+      throw new Error("Quote mint not found");
+    }
+    const amount = new u64(fromAmount * 10 ** fromMintInfo.decimals);
+
+    // If the user already has a wrapped SOL account, then we perform a
+    // transfer to the existing wrapped SOl account by
+    //
+    // * generating a new one
+    // * minting wrapped sol
+    // * sending tokens to the previously existing wrapped sol account
+    // * closing the newly created wrapped sol account
+    //
+    // If a wrapped SOL account doesn't exist, then we create an associated
+    // token account to mint the SOL and then leave it open.
+    //
+    const wrappedSolAccount = toWallet ? Keypair.generate() : undefined;
+    const wrappedSolPubkey = wrappedSolAccount
+      ? wrappedSolAccount.publicKey
+      : await Token.getAssociatedTokenAddress(
+          ASSOCIATED_TOKEN_PROGRAM_ID,
+          TOKEN_PROGRAM_ID,
+          fromMint,
+          swapClient.program.provider.wallet.publicKey
+        );
+
+    // Wrap the SOL.
+    const { tx, signers } = await wrapSol(
+      swapClient.program.provider,
+      fromMint,
+      amount,
+      wrappedSolAccount
+    );
+
+    // Close the newly created account, if needed.
+    if (toWallet) {
+      tx.add(
+        Token.createTransferInstruction(
+          TOKEN_PROGRAM_ID,
+          wrappedSolPubkey,
+          toWallet.publicKey,
+          swapClient.program.provider.wallet.publicKey,
+          [],
+          amount
+        )
+      );
+      const { tx: unwrapTx, signers: unwrapSigners } = unwrapSol(
+        swapClient.program.provider,
+        wrappedSolPubkey
+      );
+      tx.add(unwrapTx);
+      signers.push(...unwrapSigners);
+    }
+    await swapClient.program.provider.send(tx, signers);
+  };
+
+  const sendUnwrapSolTransaction = async () => {
+    if (!fromMintInfo || !toMintInfo) {
+      throw new Error("Unable to calculate mint decimals");
+    }
+    if (!quoteMint || !quoteMintInfo) {
+      throw new Error("Quote mint not found");
+    }
+    const amount = new u64(fromAmount * 10 ** fromMintInfo.decimals);
+
+    // Unwrap *without* closing the existing wrapped account:
+    //
+    // * Create a new Wrapped SOL account.
+    // * Send wrapped tokens there.
+    // * Unwrap (i.e. close the newly created wrapped account).
+    const wrappedSolAccount = Keypair.generate();
+    const { tx, signers } = await wrapSol(
+      swapClient.program.provider,
+      fromMint,
+      amount,
+      wrappedSolAccount
+    );
+    tx.add(
+      Token.createTransferInstruction(
+        TOKEN_PROGRAM_ID,
+        fromWallet!.publicKey,
+        wrappedSolAccount.publicKey,
+        swapClient.program.provider.wallet.publicKey,
+        [],
+        amount
+      )
+    );
+    const { tx: unwrapTx, signers: unwrapSigners } = unwrapSol(
+      swapClient.program.provider,
+      wrappedSolAccount.publicKey
+    );
+    tx.add(unwrapTx);
+    signers.push(...unwrapSigners);
+
+    await swapClient.program.provider.send(tx, signers);
+  };
+
+  const sendUnwrapSolletTransaction = async () => {
+    interface SolletBody {
+      address: string;
+      blockchain: string;
+      coin: string;
+      size: number;
+      wusdtToUsdt?: boolean;
+      wusdcToUsdc?: boolean;
+    }
+    const solletReqBody: SolletBody = {
+      address: toWallet!.publicKey.toString(),
+      blockchain: "sol",
+      coin: toMint.toString(),
+      size: 1,
+    };
+    if (fromMint.equals(SOLLET_USDT_MINT)) {
+      solletReqBody.wusdtToUsdt = true;
+    } else {
+      solletReqBody.wusdcToUsdc = true;
+    }
+    const solletRes = await fetch("https://swap.sollet.io/api/swap_to", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(solletReqBody),
+    });
+
+    const { address: bridgeAddr, maxSize } = (await solletRes.json())
+      .result as {
+      address: string;
+      maxSize: number;
+    };
+
+    const tx = new Transaction();
+    const amount = new u64(fromAmount * 10 ** fromMintInfo!.decimals);
+    tx.add(
+      Token.createTransferInstruction(
+        TOKEN_PROGRAM_ID,
+        fromWallet!.publicKey,
+        new PublicKey(bridgeAddr),
+        swapClient.program.provider.wallet.publicKey,
+        [],
+        amount
+      )
+    );
+    tx.add(
+      new TransactionInstruction({
+        keys: [],
+        data: Buffer.from(toWallet!.publicKey.toString(), "utf-8"),
+        programId: MEMO_PROGRAM_ID,
+      })
+    );
+
+    await swapClient.program.provider.send(tx);
+  };
+
   const sendSwapTransaction = async () => {
     if (!fromMintInfo || !toMintInfo) {
       throw new Error("Unable to calculate mint decimals");
@@ -384,12 +750,6 @@ export function SwapButton() {
         quoteDecimals: quoteMintInfo.decimals,
         strict: isStrict,
       };
-      const fromOpenOrders = fromMarket
-        ? openOrders.get(fromMarket?.address.toString())
-        : undefined;
-      const toOpenOrders = toMarket
-        ? openOrders.get(toMarket?.address.toString())
-        : undefined;
       const fromWalletAddr = fromMint.equals(SOL_MINT)
         ? wrappedSolAccount!.publicKey
         : fromWallet
@@ -401,6 +761,12 @@ export function SwapButton() {
         ? toWallet.publicKey
         : undefined;
 
+      const fromOpenOrdersList = openOrders.get(fromMarket?.address.toString());
+      let fromOpenOrders: PublicKey | undefined = undefined;
+      if (fromOpenOrdersList) {
+        fromOpenOrders = fromOpenOrdersList[0].address;
+      }
+
       return await swapClient.swapTxs({
         fromMint,
         toMint,
@@ -411,7 +777,7 @@ export function SwapButton() {
         fromMarket,
         toMarket,
         // Automatically created if undefined.
-        fromOpenOrders: fromOpenOrders ? fromOpenOrders[0].address : undefined,
+        fromOpenOrders,
         toOpenOrders: toOpenOrders ? toOpenOrders[0].address : undefined,
         fromWallet: fromWalletAddr,
         toWallet: toWalletAddr,
@@ -428,13 +794,13 @@ export function SwapButton() {
       }
       const { tx: wrapTx, signers: wrapSigners } = await wrapSol(
         swapClient.program.provider,
-        wrappedSolAccount as Keypair,
         fromMint,
-        amount
+        amount,
+        wrappedSolAccount as Keypair
       );
       const { tx: unwrapTx, signers: unwrapSigners } = unwrapSol(
         swapClient.program.provider,
-        wrappedSolAccount as Keypair
+        wrappedSolAccount!.publicKey
       );
       const tx = new Transaction();
       tx.add(wrapTx);
@@ -447,7 +813,73 @@ export function SwapButton() {
 
     await swapClient.program.provider.sendAll(txs);
   };
-  return (
+
+  if (disconnected) {
+    return (
+      <Button
+        variant="contained"
+        className={styles.swapButton}
+        onClick={sendCreateAccountsTransaction}
+        disabled={true}
+      >
+        Disconnected
+      </Button>
+    );
+  }
+  if (!isDexLoaded || !isTokensLoaded) {
+    return (
+      <Button
+        variant="contained"
+        className={styles.swapButton}
+        onClick={sendSwapTransaction}
+        disabled={true}
+      >
+        Loading
+      </Button>
+    );
+  }
+
+  return !fromWallet || insufficientBalance ? (
+    <Button variant="contained" className={styles.swapButton} disabled={true}>
+      Insufficient balance
+    </Button>
+  ) : needsCreateAccounts ? (
+    <Button
+      variant="contained"
+      className={styles.swapButton}
+      onClick={sendCreateAccountsTransaction}
+      disabled={!canCreateAccounts}
+    >
+      Create Accounts
+    </Button>
+  ) : isWrapSol ? (
+    <Button
+      variant="contained"
+      className={styles.swapButton}
+      onClick={sendWrapSolTransaction}
+      disabled={!canWrapOrUnwrap}
+    >
+      Wrap SOL
+    </Button>
+  ) : isUnwrapSol ? (
+    <Button
+      variant="contained"
+      className={styles.swapButton}
+      onClick={sendUnwrapSolTransaction}
+      disabled={!canWrapOrUnwrap}
+    >
+      Unwrap SOL
+    </Button>
+  ) : isUnwrapSollet ? (
+    <Button
+      variant="contained"
+      className={styles.swapButton}
+      onClick={sendUnwrapSolletTransaction}
+      disabled={fromAmount <= 0}
+    >
+      Unwrap
+    </Button>
+  ) : (
     <Button
       variant="contained"
       className={styles.swapButton}
@@ -459,33 +891,56 @@ export function SwapButton() {
   );
 }
 
+// If wrappedSolAccount is undefined, then creates the account with
+// an associated token account.
 async function wrapSol(
   provider: Provider,
-  wrappedSolAccount: Keypair,
   fromMint: PublicKey,
-  amount: BN
+  amount: BN,
+  wrappedSolAccount?: Keypair
 ): Promise<{ tx: Transaction; signers: Array<Signer | undefined> }> {
   const tx = new Transaction();
-  const signers = [wrappedSolAccount];
+  const signers = wrappedSolAccount ? [wrappedSolAccount] : [];
+  let wrappedSolPubkey;
   // Create new, rent exempt account.
-  tx.add(
-    SystemProgram.createAccount({
-      fromPubkey: provider.wallet.publicKey,
-      newAccountPubkey: wrappedSolAccount.publicKey,
-      lamports: await Token.getMinBalanceRentForExemptAccount(
-        provider.connection
-      ),
-      space: 165,
-      programId: TOKEN_PROGRAM_ID,
-    })
-  );
+  if (wrappedSolAccount === undefined) {
+    wrappedSolPubkey = await Token.getAssociatedTokenAddress(
+      ASSOCIATED_TOKEN_PROGRAM_ID,
+      TOKEN_PROGRAM_ID,
+      fromMint,
+      provider.wallet.publicKey
+    );
+    tx.add(
+      Token.createAssociatedTokenAccountInstruction(
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+        TOKEN_PROGRAM_ID,
+        fromMint,
+        wrappedSolPubkey,
+        provider.wallet.publicKey,
+        provider.wallet.publicKey
+      )
+    );
+  } else {
+    wrappedSolPubkey = wrappedSolAccount.publicKey;
+    tx.add(
+      SystemProgram.createAccount({
+        fromPubkey: provider.wallet.publicKey,
+        newAccountPubkey: wrappedSolPubkey,
+        lamports: await Token.getMinBalanceRentForExemptAccount(
+          provider.connection
+        ),
+        space: 165,
+        programId: TOKEN_PROGRAM_ID,
+      })
+    );
+  }
   // Transfer lamports. These will be converted to an SPL balance by the
   // token program.
   if (fromMint.equals(SOL_MINT)) {
     tx.add(
       SystemProgram.transfer({
         fromPubkey: provider.wallet.publicKey,
-        toPubkey: wrappedSolAccount.publicKey,
+        toPubkey: wrappedSolPubkey,
         lamports: amount.toNumber(),
       })
     );
@@ -495,7 +950,7 @@ async function wrapSol(
     Token.createInitAccountInstruction(
       TOKEN_PROGRAM_ID,
       WRAPPED_SOL_MINT,
-      wrappedSolAccount.publicKey,
+      wrappedSolPubkey,
       provider.wallet.publicKey
     )
   );
@@ -504,17 +959,39 @@ async function wrapSol(
 
 function unwrapSol(
   provider: Provider,
-  wrappedSolAccount: Keypair
+  wrappedSol: PublicKey
 ): { tx: Transaction; signers: Array<Signer | undefined> } {
   const tx = new Transaction();
   tx.add(
     Token.createCloseAccountInstruction(
       TOKEN_PROGRAM_ID,
-      wrappedSolAccount.publicKey,
+      wrappedSol,
       provider.wallet.publicKey,
       provider.wallet.publicKey,
       []
     )
   );
   return { tx, signers: [] };
+}
+function getNewTokenAccountData(
+  toAssociatedPubkey: PublicKey,
+  mint: PublicKey,
+  owner: PublicKey
+): CachedToken {
+  return {
+    publicKey: toAssociatedPubkey,
+    account: {
+      address: toAssociatedPubkey,
+      mint,
+      owner,
+      amount: new u64(0),
+      delegate: null,
+      delegatedAmount: new u64(0),
+      isInitialized: true,
+      isFrozen: false,
+      isNative: false,
+      rentExemptReserve: null,
+      closeAuthority: null,
+    },
+  };
 }

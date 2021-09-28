@@ -1,46 +1,64 @@
 import React, { useContext, useState, useEffect } from "react";
-import * as assert from "assert";
 import { useAsync } from "react-async-hook";
 import { Provider, BN } from "@project-serum/anchor";
 import { PublicKey, Account } from "@solana/web3.js";
 import {
   MintInfo,
-  AccountInfo as TokenAccount,
+  AccountInfo as TokenAccountInfo,
   Token,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
+import assert from "assert";
 import {
   getOwnedAssociatedTokenAccounts,
   parseTokenAccountData,
 } from "../utils/tokens";
 import { SOL_MINT } from "../utils/pubkeys";
 
+export type CachedToken = {
+  publicKey: PublicKey; // Token account address
+  account: TokenAccountInfo;
+};
+
 export type TokenContext = {
   provider: Provider;
+  isLoaded: boolean;
+  refreshTokenState(): void;
 };
 const _TokenContext = React.createContext<TokenContext | null>(null);
+
+const _OWNED_TOKEN_ACCOUNTS_CACHE: CachedToken[] = [];
+
+export function addTokensToCache(tokenList: CachedToken[]) {
+  _OWNED_TOKEN_ACCOUNTS_CACHE.push(...tokenList);
+}
 
 export function TokenContextProvider(props: any) {
   const provider = props.provider;
   const [, setRefresh] = useState(0);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  function refreshTokenState() {
+    setRefresh((r) => r + 1);
+  }
 
   // Fetch all the owned token accounts for the wallet.
   useEffect(() => {
     if (!provider.wallet.publicKey) {
-      _OWNED_TOKEN_ACCOUNTS_CACHE.length = 0;
       setRefresh((r) => r + 1);
       return;
     }
-    // Fetch SPL tokens.
+    // Fetch all SPL tokens belonging to the user
     getOwnedAssociatedTokenAccounts(
       provider.connection,
       provider.wallet.publicKey
     ).then((accs) => {
       if (accs) {
         // @ts-ignore
-        _OWNED_TOKEN_ACCOUNTS_CACHE.push(...accs);
+        addTokensToCache(accs);
         setRefresh((r) => r + 1);
       }
+      setIsLoaded(true);
     });
     // Fetch SOL balance.
     provider.connection
@@ -55,6 +73,7 @@ export function TokenContextProvider(props: any) {
               mint: SOL_MINT,
             },
           });
+
           setRefresh((r) => r + 1);
         }
       });
@@ -64,6 +83,8 @@ export function TokenContextProvider(props: any) {
     <_TokenContext.Provider
       value={{
         provider,
+        isLoaded,
+        refreshTokenState,
       }}
     >
       {props.children}
@@ -71,7 +92,7 @@ export function TokenContextProvider(props: any) {
   );
 }
 
-function useTokenContext() {
+export function useTokenContext() {
   const ctx = useContext(_TokenContext);
   if (ctx === null) {
     throw new Error("Context not available");
@@ -83,9 +104,11 @@ function useTokenContext() {
 // Undefined => loading.
 export function useOwnedTokenAccount(
   mint?: PublicKey
-): { publicKey: PublicKey; account: TokenAccount } | null | undefined {
+): { publicKey: PublicKey; account: TokenAccountInfo } | null | undefined {
   const { provider } = useTokenContext();
+
   const [, setRefresh] = useState(0);
+
   const tokenAccounts = _OWNED_TOKEN_ACCOUNTS_CACHE.filter(
     (account) => mint && account.account.mint.equals(mint)
   );
@@ -100,6 +123,7 @@ export function useOwnedTokenAccount(
   );
 
   let tokenAccount = tokenAccounts[0];
+
   const isSol = mint?.equals(SOL_MINT);
 
   // Stream updates when the balance changes.
@@ -110,14 +134,15 @@ export function useOwnedTokenAccount(
       listener = provider.connection.onAccountChange(
         provider.wallet.publicKey,
         (info: { lamports: number }) => {
-          const token = {
+          const updatedTokenData = {
             amount: new BN(info.lamports),
             mint: SOL_MINT,
-          } as TokenAccount;
-          if (token.amount !== tokenAccount.account.amount) {
+          } as TokenAccountInfo;
+          if (updatedTokenData.amount !== tokenAccount.account.amount) {
             const index = _OWNED_TOKEN_ACCOUNTS_CACHE.indexOf(tokenAccount);
             assert.ok(index >= 0);
-            _OWNED_TOKEN_ACCOUNTS_CACHE[index].account = token;
+            _OWNED_TOKEN_ACCOUNTS_CACHE[index].account = updatedTokenData;
+
             setRefresh((r) => r + 1);
           }
         }
@@ -144,6 +169,7 @@ export function useOwnedTokenAccount(
         }
       );
     }
+    // Clean-up side effects. Called on re-rendering
     return () => {
       if (listener) {
         provider.connection.removeAccountChangeListener(listener);
@@ -151,10 +177,12 @@ export function useOwnedTokenAccount(
     };
   }, [provider.connection, tokenAccount]);
 
+  // Loading
   if (mint === undefined) {
     return undefined;
   }
 
+  // Account for given mint does not exist
   if (!isSol && tokenAccounts.length === 0) {
     return null;
   }
@@ -194,13 +222,9 @@ export function setMintCache(pk: PublicKey, account: MintInfo) {
   _MINT_CACHE.set(pk.toString(), new Promise((resolve) => resolve(account)));
 }
 
-// Cache storing all token accounts for the connected wallet provider.
-const _OWNED_TOKEN_ACCOUNTS_CACHE: Array<{
-  publicKey: PublicKey;
-  account: TokenAccount;
-}> = [];
-
 // Cache storing all previously fetched mint infos.
+// Initially SOL_MINT and mints of existing token accounts are stored
+// A mint is added for each new token opened
 // @ts-ignore
 const _MINT_CACHE = new Map<string, Promise<MintInfo>>([
   [SOL_MINT.toString(), { decimals: 9 }],

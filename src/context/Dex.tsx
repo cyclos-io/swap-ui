@@ -26,7 +26,7 @@ import {
 import { useTokenMap, useTokenListContext } from "./TokenList";
 import { fetchSolletInfo, requestWormholeSwapMarketIfNeeded } from "./Sollet";
 import { setMintCache } from "./Token";
-import { useSwapContext } from "./Swap";
+import { useSwapContext, useIsWrapSol } from "./Swap";
 
 const BASE_TAKER_FEE_BPS = 0.0022;
 export const FEE_MULTIPLIER = 1 - BASE_TAKER_FEE_BPS;
@@ -35,14 +35,17 @@ type DexContext = {
   // Maps market address to open orders accounts.
   openOrders: Map<string, Array<OpenOrders>>;
   closeOpenOrders: (openOrder: OpenOrders) => void;
+  addOpenOrderAccount: (market: PublicKey, accountData: OpenOrders) => void;
   swapClient: SwapClient;
+  isLoaded: boolean;
 };
-const _DexContext = React.createContext<DexContext | null>(null);
+export const _DexContext = React.createContext<DexContext | null>(null);
 
 export function DexContextProvider(props: any) {
   const [ooAccounts, setOoAccounts] = useState<Map<string, Array<OpenOrders>>>(
     new Map()
   );
+  const [isLoaded, setIsLoaded] = useState(false);
   const swapClient = props.swapClient;
 
   // Removes the given open orders from the context.
@@ -57,6 +60,16 @@ export function DexContextProvider(props: any) {
       newOoAccounts.delete(openOrder.market.toString());
     }
     setOoAccounts(newOoAccounts);
+  };
+
+  const addOpenOrderAccount = async (
+    market: PublicKey,
+    accountData: OpenOrders
+  ) => {
+    const newOoAccounts = new Map(ooAccounts);
+    newOoAccounts.set(market.toString(), [accountData]);
+    setOoAccounts(newOoAccounts);
+    setIsLoaded(true);
   };
 
   // Three operations:
@@ -154,6 +167,8 @@ export function DexContextProvider(props: any) {
           new Promise<Market>((resolve) => resolve(m.account))
         );
       });
+
+      setIsLoaded(true);
     });
   }, [
     swapClient.program.provider.connection,
@@ -165,7 +180,9 @@ export function DexContextProvider(props: any) {
       value={{
         openOrders: ooAccounts,
         closeOpenOrders,
+        addOpenOrderAccount,
         swapClient,
+        isLoaded,
       }}
     >
       {props.children}
@@ -412,6 +429,11 @@ export function useFairRoute(
   const fromBbo = useBbo(route ? route[0] : undefined);
   const fromMarket = useMarket(route ? route[0] : undefined);
   const toBbo = useBbo(route ? route[1] : undefined);
+  const { isWrapUnwrap } = useIsWrapSol(fromMint, toMint);
+
+  if (isWrapUnwrap) {
+    return undefined;
+  }
 
   if (route === null) {
     return undefined;

@@ -1,8 +1,9 @@
 import React, { useContext, useMemo, useState, useEffect } from "react";
 import { TokenInfo } from "@solana/spl-token-registry";
-import { SOL_MINT } from "../utils/pubkeys";
 import { PublicKey } from "@solana/web3.js";
+import { WRAPPED_SOL_MINT } from "@project-serum/serum/lib/token-instructions";
 import { LocalStorage } from "../utils/localStorage";
+import { SOL_MINT } from "../utils/pubkeys";
 
 interface TokenCommonBaseInfo extends TokenInfo {
   isCommonBase: boolean;
@@ -48,7 +49,16 @@ const SOL_TOKEN_INFO = {
 
 export function TokenListContextProvider(props: any) {
   const tokenList = useMemo(() => {
-    const list = props.tokenList.filterByClusterSlug("mainnet-beta").getList();
+    const list = props.tokenList
+      .filterByClusterSlug("mainnet-beta")
+      .getList()
+      .map((t: TokenInfo) => {
+        if (t.address === WRAPPED_SOL_MINT.toString()) {
+          // @ts-ignore
+          t.symbol = "wSOL";
+        }
+        return t;
+      });
     // Manually add a fake SOL mint for the native token. The component is
     // opinionated in that it distinguishes between wrapped SOL and SOL.
     list.push(SOL_TOKEN_INFO);
