@@ -16,11 +16,18 @@ import {
   Tabs,
   Tab,
   Grid,
+  ListItemText,
+  Box,
+  IconButton,
+  useMediaQuery,
 } from "@material-ui/core";
 import { StarOutline, Star } from "@material-ui/icons";
 import { TokenIcon } from "./Swap";
-import { useSwappableTokens, useTokenBase } from "../context/TokenList";
-import { useMediaQuery } from "@material-ui/core";
+import {
+  useSwappableTokens,
+  useTokenBase,
+  useTokenListContext,
+} from "../context/TokenList";
 
 const useStyles = makeStyles((theme) => ({
   dialogContent: {
@@ -206,6 +213,11 @@ function TokenListItem({
   const styles = useStyles();
   const mint = new PublicKey(tokenInfo.address);
 
+  const { ownedTokensDetailed } = useTokenListContext();
+  const details = ownedTokensDetailed.filter(
+    (t) => t.address === tokenInfo.address
+  )?.[0];
+
   return (
     <ListItem button>
       <div onClick={() => onClick(mint)} className={styles.tokenSelector}>
@@ -215,13 +227,24 @@ function TokenListItem({
         />
         <TokenName tokenInfo={tokenInfo} />
       </div>
-      <Chip
-        variant="outlined"
-        label={isCommonBase ? <Star /> : <StarOutline />}
+      {/* Token quantity and price */}
+      {+details?.balance > 0 && (
+        <Box mr={1} textAlign="end">
+          <ListItemText
+            primary={details?.balance}
+            secondary={`$${details?.usd}`}
+          />
+        </Box>
+      )}
+      {/* Add as common base button */}
+      <IconButton
+        aria-label="is-common-base"
         onClick={() =>
           isCommonBase ? removeBase(tokenInfo) : addNewBase(tokenInfo)
         }
-      />
+      >
+        {isCommonBase ? <Star /> : <StarOutline />}
+      </IconButton>
     </ListItem>
   );
 }

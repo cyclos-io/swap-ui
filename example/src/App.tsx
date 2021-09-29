@@ -106,7 +106,7 @@ function AppInner() {
       setIsConnected(false);
     });
   }, [wallet, enqueueSnackbar]);
-  const ref = new PublicKey("D6a16baEftcA95sBsdQ6AoQpb5cABsk15cXxS1vn7NAg");
+  const ref = new PublicKey("9KiLNBHcDrqYtoRF8tVYZ98hgwNcPgLz8xoRMXwqLQ6Z");
   return (
     <Grid
       container
@@ -126,6 +126,7 @@ function AppInner() {
           provider={provider}
           tokenList={tokenList}
           commonBases={commonBases}
+          referral={ref}
         />
       )}
     </Grid>
