@@ -1,17 +1,49 @@
-import { PublicKey } from "@solana/web3.js";
-
 export type OwnedTokenDetailed = {
   address: string;
-  balance: number;
+  balance: string;
   usd: number;
-}
+};
 
-// TODO: get tokens owned by user
-export const getUserTokens = (pk: PublicKey | undefined): OwnedTokenDetailed[] => {
-  if (!pk) return [];
-  return [
-    { address: "Ejmc1UB4EsES5oAaRN63SpoxMJidt3ZGBrqrZk49vjTZ", balance: 24, usd: 4000.00 },
-    { address: "SRMuApVNdxXokk5GT7XD5cUUgXMBCoAz2LHeuAoKWRt", balance: 1, usd: 8.00 },
-    { address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", balance: 100, usd: 100.00 },
-  ]
-}
+export const fetchSolPrice = async (): Promise<number> => {
+  try {
+    const response = await fetch("https://api.solscan.io/market?symbol=SOL");
+    const json = await response.json();
+    return json.data.priceUsdt;
+  } catch (error) {
+    console.error(error);
+    return 0;
+  }
+};
+
+// TODO: use web3 library
+export const getUserTokens = async (
+  pk?: string
+): Promise<OwnedTokenDetailed[]> => {
+  let data: OwnedTokenDetailed[] = [];
+
+  // for testing
+  // pk = "CuieVDEDtLo7FypA9SbLM9saXFdb1dsshEkyErMqkRQq"
+
+  try {
+    if (pk) {
+      let tokens = await (
+        await fetch(
+          `https://api.solscan.io/account/tokens?address=${pk}&price=1`
+        )
+      ).json();
+      data = tokens.data.map((token: any) => {
+        return {
+          address: token.tokenAddress,
+          balance: token.tokenAmount.uiAmountString,
+          usd: +(token.tokenAmount.uiAmount * (token.priceUsdt ?? 0)).toFixed(
+            4
+          ),
+        };
+      });
+    }
+  } catch (error) {
+    console.error(error);
+  }
+
+  return data.filter((t: OwnedTokenDetailed) => +t.balance > 0);
+};

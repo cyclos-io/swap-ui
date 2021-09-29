@@ -1,8 +1,12 @@
-import React, { useContext, useMemo } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import { TokenInfo } from "@solana/spl-token-registry";
 import { SOL_MINT } from "../utils/pubkeys";
 import { PublicKey } from "@solana/web3.js";
-import { getUserTokens, OwnedTokenDetailed } from "../utils/userTokens";
+import {
+  fetchSolPrice,
+  getUserTokens,
+  OwnedTokenDetailed,
+} from "../utils/userTokens";
 
 type TokenListContext = {
   tokenMap: Map<string, TokenInfo>;
@@ -40,6 +44,10 @@ const SOL_TOKEN_INFO = {
 };
 
 export function TokenListContextProvider(props: any) {
+  const [ownedTokensDetailed, setOwnedTokensDetailed] = useState<
+    OwnedTokenDetailed[]
+  >([]);
+
   const tokenList = useMemo(() => {
     const list = props.tokenList.filterByClusterSlug("mainnet-beta").getList();
     // Manually add a fake SOL mint for the native token. The component is
@@ -59,7 +67,29 @@ export function TokenListContextProvider(props: any) {
     return tokenMap;
   }, [tokenList]);
 
-  const ownedTokensDetailed = useMemo(() => getUserTokens(pk), [pk]);
+  useEffect(() => {
+    (async () => {
+      let solBalance: number = 0;
+      if (pk) solBalance = await props.provider.connection.getBalance(pk);
+      const tokens = await getUserTokens(pk?.toString());
+      const solPrice = await fetchSolPrice();
+
+      solBalance = solBalance / 10 ** +SOL_TOKEN_INFO.decimals;
+
+      const SolDetails = {
+        address: SOL_TOKEN_INFO.address,
+        balance: solBalance.toFixed(6),
+        usd: +(solBalance * solPrice).toFixed(4),
+      };
+      // only show the sol token if wallet is connected
+      if (pk) {
+        setOwnedTokensDetailed([SolDetails, ...tokens]);
+      } else {
+        // on disconnect, tokens = []
+        setOwnedTokensDetailed(tokens);
+      }
+    })();
+  }, [pk]);
 
   // Tokens with USD(x) quoted markets.
   const swappableTokens = useMemo(() => {
@@ -78,17 +108,21 @@ export function TokenListContextProvider(props: any) {
         ownedTokensList.includes(t.address) ? [[...p, t], f] : [p, [...f, t]],
       [[], []]
     );
-
     notOwnedtokens.sort((a: TokenInfo, b: TokenInfo) =>
       a.symbol < b.symbol ? -1 : a.symbol > b.symbol ? 1 : 0
     );
+    // sort by price in USD
     ownedTokens.sort(
-      (a: TokenInfo, b: TokenInfo) => b.address.length - a.address.length
+      (a: TokenInfo, b: TokenInfo) =>
+        +ownedTokensDetailed.filter((t: any) => t.address === b.address)?.[0]
+          .usd -
+        +ownedTokensDetailed.filter((t: any) => t.address === a.address)?.[0]
+          .usd
     );
     const tokens = ownedTokens.concat(notOwnedtokens);
 
     return tokens;
-  }, [tokenList, tokenMap, pk]);
+  }, [tokenList, tokenMap, ownedTokensDetailed]);
 
   // Sollet wrapped tokens.
   const [swappableTokensSollet, solletMap] = useMemo(() => {

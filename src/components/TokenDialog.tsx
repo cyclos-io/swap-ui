@@ -172,7 +172,7 @@ function TokenListItem({
         />
       </ListItemAvatar>
       <ListItemText primary={tokenInfo?.symbol} secondary={tokenInfo?.name} />
-      {details?.balance > 0 && (
+      {+details?.balance > 0 && (
         <Box mr={1} textAlign="end">
           <ListItemText
             primary={details?.balance}
