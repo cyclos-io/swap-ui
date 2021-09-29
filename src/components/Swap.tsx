@@ -32,13 +32,13 @@ import {
   useSwapContext,
   useSwapFair,
 } from "../context/Swap";
-// import { useIsUnwrapSolletUsdt, useSwapContext, useSwapFair } from "../context/Swap";
 import {
   useDexContext,
   useRouteVerbose,
   useMarket,
   FEE_MULTIPLIER,
   _DexContext,
+  useBbo,
 } from "../context/Dex";
 import { useTokenMap } from "../context/TokenList";
 import {
@@ -60,6 +60,7 @@ import {
   SOLLET_USDT_MINT,
 } from "../utils/pubkeys";
 import { getTokenAddrressAndCreateIx } from "../utils/tokens";
+import { TokenInfo } from "@solana/spl-token-registry";
 
 const useStyles = makeStyles((theme) => ({
   card: {
@@ -82,6 +83,10 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 16,
     fontWeight: 700,
     padding: theme.spacing(1.5),
+    "&:disabled": {
+      cursor: "not-allowed",
+      pointerEvents: "all !important",
+    },
   },
   swapToFromButton: {
     display: "block",
@@ -357,6 +362,7 @@ export function SwapButton() {
     fromMint,
     toMint,
     fromAmount,
+    toAmount,
     slippage,
     isClosingNewAccounts,
     isStrict,
@@ -368,6 +374,7 @@ export function SwapButton() {
     openOrders,
   } = useDexContext();
   const { isLoaded: isTokensLoaded, refreshTokenState } = useTokenContext();
+  const tokenMap = useTokenMap();
 
   // Token to be traded away
   const fromMintInfo = useMint(fromMint);
@@ -379,6 +386,7 @@ export function SwapButton() {
     route && route.markets ? route.markets[0] : undefined
   );
 
+  // Second market in case of multi-market swap
   const toMarket = useMarket(
     route && route.markets ? route.markets[1] : undefined
   );
@@ -390,7 +398,8 @@ export function SwapButton() {
   const quoteMint = fromMarket && fromMarket.quoteMintAddress;
   const quoteMintInfo = useMint(quoteMint);
   const quoteWallet = useOwnedTokenAccount(quoteMint);
-
+  const fromMarketBbo = useBbo(fromMarket?.publicKey);
+  const toMarketMidBbo = useBbo(toMarket?.publicKey);
   const canCreateAccounts = useCanCreateAccounts();
   const canWrapOrUnwrap = useCanWrapOrUnwrap();
   const canSwap = useCanSwap();
@@ -420,6 +429,33 @@ export function SwapButton() {
   const needsCreateAccounts =
     !toWallet ||
     (!isUnwrapSollet && (!fromOpenOrders || (toMarket && !toOpenOrders)));
+
+  // Display to user if swap amounts are below min order sizes
+  let minAmountForSwap = 0;
+  let shortTokenName = "";
+
+  const fromMarketIsBid = fromMarket?.quoteMintAddress.equals(fromMint);
+  const aboveFromMarketMinAmount =
+    fromMarket &&
+    (fromMarketIsBid ? toAmount : fromAmount) >= fromMarket.minOrderSize;
+  const aboveToMarketMinAmount = toMarket && toAmount >= toMarket.minOrderSize;
+
+  if (aboveFromMarketMinAmount === false) {
+    const tokenInfo = tokenMap.get(fromMarket!.baseMintAddress.toString());
+    shortTokenName = tokenInfo!.symbol;
+    minAmountForSwap = fromMarket!.minOrderSize;
+  } else if (aboveToMarketMinAmount === false) {
+    const fromTokenWorth = fromAmount * (fromMarketBbo?.bestBid ?? 0);
+    const toTokenWorth = toAmount * (toMarketMidBbo?.bestBid ?? 0);
+    const marketWithBiggerMinWorth =
+      fromTokenWorth > toTokenWorth ? fromMarket : toMarket;
+    const tokenInfo = tokenMap.get(
+      marketWithBiggerMinWorth!.baseMintAddress.toString()
+    );
+
+    shortTokenName = tokenInfo!.symbol;
+    minAmountForSwap = marketWithBiggerMinWorth!.minOrderSize;
+  }
 
   // Click handlers.
 
@@ -810,7 +846,6 @@ export function SwapButton() {
       txs[0].signers.push(...wrapSigners);
       txs[0].signers.push(...unwrapSigners);
     }
-
     await swapClient.program.provider.sendAll(txs);
   };
 
@@ -878,6 +913,15 @@ export function SwapButton() {
       disabled={fromAmount <= 0}
     >
       Unwrap
+    </Button>
+  ) : aboveFromMarketMinAmount === false || aboveToMarketMinAmount === false ? (
+    <Button
+      variant="contained"
+      className={styles.swapButton}
+      onClick={sendSwapTransaction}
+      disabled={true}
+    >
+      Min {minAmountForSwap + " " + shortTokenName} Required
     </Button>
   ) : (
     <Button
