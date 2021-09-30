@@ -31,6 +31,7 @@ import {
   useCanWrapOrUnwrap,
   useSwapContext,
   useSwapFair,
+  useMinSwapAmount,
 } from "../context/Swap";
 import {
   useDexContext,
@@ -38,7 +39,6 @@ import {
   useMarket,
   FEE_MULTIPLIER,
   _DexContext,
-  useBbo,
 } from "../context/Dex";
 import { useTokenMap } from "../context/TokenList";
 import {
@@ -398,13 +398,12 @@ export function SwapButton() {
   const quoteMint = fromMarket && fromMarket.quoteMintAddress;
   const quoteMintInfo = useMint(quoteMint);
   const quoteWallet = useOwnedTokenAccount(quoteMint);
-  const fromMarketBbo = useBbo(fromMarket?.publicKey);
-  const toMarketMidBbo = useBbo(toMarket?.publicKey);
   const canCreateAccounts = useCanCreateAccounts();
   const canWrapOrUnwrap = useCanWrapOrUnwrap();
   const canSwap = useCanSwap();
   const referral = useReferral(fromMarket);
   const fair = useSwapFair();
+  const minSwapAmount = useMinSwapAmount(fromMarket, toMarket);
 
   const { isWrapSol, isUnwrapSol } = useIsWrapSol(fromMint, toMint);
   const isUnwrapSollet = useIsUnwrapSollet(fromMint, toMint);
@@ -429,33 +428,6 @@ export function SwapButton() {
   const needsCreateAccounts =
     !toWallet ||
     (!isUnwrapSollet && (!fromOpenOrders || (toMarket && !toOpenOrders)));
-
-  // Display to user if swap amounts are below min order sizes
-  let minAmountForSwap = 0;
-  let shortTokenName = "";
-
-  const fromMarketIsBid = fromMarket?.quoteMintAddress.equals(fromMint);
-  const aboveFromMarketMinAmount =
-    fromMarket &&
-    (fromMarketIsBid ? toAmount : fromAmount) >= fromMarket.minOrderSize;
-  const aboveToMarketMinAmount = toMarket && toAmount >= toMarket.minOrderSize;
-
-  if (aboveFromMarketMinAmount === false) {
-    const tokenInfo = tokenMap.get(fromMarket!.baseMintAddress.toString());
-    shortTokenName = tokenInfo!.symbol;
-    minAmountForSwap = fromMarket!.minOrderSize;
-  } else if (aboveToMarketMinAmount === false) {
-    const fromTokenWorth = fromAmount * (fromMarketBbo?.bestBid ?? 0);
-    const toTokenWorth = toAmount * (toMarketMidBbo?.bestBid ?? 0);
-    const marketWithBiggerMinWorth =
-      fromTokenWorth > toTokenWorth ? fromMarket : toMarket;
-    const tokenInfo = tokenMap.get(
-      marketWithBiggerMinWorth!.baseMintAddress.toString()
-    );
-
-    shortTokenName = tokenInfo!.symbol;
-    minAmountForSwap = marketWithBiggerMinWorth!.minOrderSize;
-  }
 
   // Click handlers.
 
@@ -914,14 +886,14 @@ export function SwapButton() {
     >
       Unwrap
     </Button>
-  ) : aboveFromMarketMinAmount === false || aboveToMarketMinAmount === false ? (
+  ) : minSwapAmount ? (
     <Button
       variant="contained"
       className={styles.swapButton}
       onClick={sendSwapTransaction}
       disabled={true}
     >
-      Min {minAmountForSwap + " " + shortTokenName} Required
+      Min {minSwapAmount} Required
     </Button>
   ) : (
     <Button

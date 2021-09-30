@@ -22,11 +22,13 @@ import {
   useRouteVerbose,
   useDexContext,
   FEE_MULTIPLIER,
+  useBbo,
 } from "./Dex";
 import {
   useTokenListContext,
   SPL_REGISTRY_SOLLET_TAG,
   SPL_REGISTRY_WORM_TAG,
+  useTokenMap,
 } from "./TokenList";
 import { useOwnedTokenAccount } from "../context/Token";
 
@@ -295,6 +297,49 @@ export function useIsUnwrapSollet(
     (fromMint.equals(SOLLET_USDT_MINT) && toMint.equals(USDT_MINT)) ||
     (fromMint.equals(SOLLET_USDC_MINT) && toMint.equals(USDC_MINT))
   );
+}
+
+function getMinSwapMessage(minAmount: number, symbol: string) {
+  if (symbol === "wSOL") {
+    symbol = "SOL";
+  }
+  return minAmount + " " + symbol;
+}
+
+// Return string message if trade amount is below minimum swap amount
+export function useMinSwapAmount(fromMarket?: Market, toMarket?: Market) {
+  const { fromMint, fromAmount, toAmount } = useSwapContext();
+  const fromMarketBbo = useBbo(fromMarket?.publicKey);
+  const toMarketMidBbo = useBbo(toMarket?.publicKey);
+  const tokenMap = useTokenMap();
+
+  if (!fromMarket) {
+    return undefined;
+  }
+  const fromMarketIsBid = fromMarket.quoteMintAddress.equals(fromMint);
+  const fromMarketMinSize = fromMarket.minOrderSize;
+  const fromMarketBaseAmount = fromMarketIsBid ? toAmount : fromAmount;
+  const belowFromMarketMinSize = fromMarketBaseAmount < fromMarketMinSize;
+
+  if (!toMarket && belowFromMarketMinSize) {
+    let tokenSymbol =
+      tokenMap.get(fromMarket!.baseMintAddress.toString())?.symbol ?? "unknown";
+    return getMinSwapMessage(fromMarketMinSize, tokenSymbol);
+  } else if (toMarket) {
+    const toMarketMinSize = toMarket.minOrderSize;
+    const belowToMarketMinSize = toAmount < toMarketMinSize;
+    if (belowToMarketMinSize || belowFromMarketMinSize) {
+      const fromTokenWorth = fromMarketMinSize * (fromMarketBbo?.bestBid ?? 0);
+      const toTokenWorth = toMarketMinSize * (toMarketMidBbo?.bestBid ?? 0);
+      const higherMinSizeWorthMarket =
+        fromTokenWorth > toTokenWorth ? fromMarket : toMarket;
+      const tokenSymbol =
+        tokenMap.get(higherMinSizeWorthMarket!.baseMintAddress.toString())
+          ?.symbol ?? "unknown";
+
+      return getMinSwapMessage(higherMinSizeWorthMarket.minOrderSize, tokenSymbol);
+    }
+  }
 }
 
 // Returns true if the user can swap with the current context.
