@@ -337,7 +337,10 @@ export function useMinSwapAmount(fromMarket?: Market, toMarket?: Market) {
         tokenMap.get(higherMinSizeWorthMarket!.baseMintAddress.toString())
           ?.symbol ?? "unknown";
 
-      return getMinSwapMessage(higherMinSizeWorthMarket.minOrderSize, tokenSymbol);
+      return getMinSwapMessage(
+        higherMinSizeWorthMarket.minOrderSize,
+        tokenSymbol
+      );
     }
   }
 }

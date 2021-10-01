@@ -42,8 +42,13 @@ const useStyles = makeStyles((theme: Theme) => ({
 export function InfoLabel() {
   const styles = useStyles();
 
-  const { slippage, fromMint, toMint, showReversePrices, setShowReversePrices } =
-    useSwapContext();
+  const {
+    slippage,
+    fromMint,
+    toMint,
+    showReversePrices,
+    setShowReversePrices,
+  } = useSwapContext();
   const fromMintInfo = useMint(fromMint);
   const toMintInfo = useMint(toMint);
   const fair = getSwapFair(showReversePrices);

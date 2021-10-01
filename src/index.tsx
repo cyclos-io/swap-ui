@@ -184,11 +184,11 @@ export type SwapProps = {
   /**
    * Styling properties for the Swap Button.
    */
-   swapButtonStyle?: any;
+  swapButtonStyle?: any;
   /**
    * Callback for wallet connection
    */
-   connectWalletCallback?: any;
+  connectWalletCallback?: any;
 };
 
 export {

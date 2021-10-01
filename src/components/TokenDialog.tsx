@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { forwardRef, useState } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { TokenInfo } from "@solana/spl-token-registry";
 import {
@@ -15,19 +15,21 @@ import {
   Avatar,
   Tabs,
   Tab,
-  Grid,
   ListItemText,
   Box,
   IconButton,
   useMediaQuery,
+  Grow,
+  useTheme,
 } from "@material-ui/core";
-import { StarOutline, Star } from "@material-ui/icons";
+import { StarOutline, Star, CloseRounded } from "@material-ui/icons";
 import { TokenIcon } from "./Swap";
 import {
   useSwappableTokens,
   useTokenBase,
   useTokenListContext,
 } from "../context/TokenList";
+import { TransitionProps } from "@material-ui/core/transitions";
 
 const useStyles = makeStyles((theme) => ({
   dialogContent: {
@@ -49,15 +51,10 @@ const useStyles = makeStyles((theme) => ({
     opacity: 0,
   },
   chip: {
-    marginRight: theme.spacing(0.4),
-    marginBottom: theme.spacing(0.5),
+    gap: theme.spacing(1),
   },
   selectTokenTitle: {
-    paddingBottom: theme.spacing(1.8),
-  },
-  commonBasesTitle: {
-    paddingTop: theme.spacing(0.5),
-    paddingBottom: theme.spacing(0.4),
+    paddingBottom: theme.spacing(2),
   },
   tokenSelector: {
     paddingTop: theme.spacing(1),
@@ -67,6 +64,13 @@ const useStyles = makeStyles((theme) => ({
     cursor: "pointer",
   },
 }));
+
+const Transition = forwardRef(function Transition(
+  props: TransitionProps & { children?: React.ReactElement<any, any> },
+  ref: React.Ref<unknown>
+) {
+  return <Grow ref={ref} {...props} />;
+});
 
 export default function TokenDialog({
   open,
@@ -105,30 +109,39 @@ export default function TokenDialog({
       open={open}
       onClose={onClose}
       scroll={"paper"}
+      TransitionComponent={Transition}
       PaperProps={{
         style: {
           borderRadius: "10px",
-          width: "420px",
+          maxWidth: "420px",
+          maxHeight: "clamp(100px, 80vh, 1000px)",
         },
       }}
     >
       <DialogTitle style={{ fontWeight: "bold" }}>
-        <Typography variant="h6" className={styles.selectTokenTitle}>
-          Select a token
-        </Typography>
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+          className={styles.selectTokenTitle}
+        >
+          <Typography variant="h6">Select a token</Typography>
+          <IconButton size="small" onClick={onClose}>
+            <CloseRounded />
+          </IconButton>
+        </Box>
         {/* Token search */}
         <TextField
           className={styles.textField}
           placeholder={"Search name"}
           value={tokenFilter}
+          size="small"
           fullWidth
           variant="outlined"
           onChange={(e) => setTokenFilter(e.target.value)}
         />
 
-        <Typography variant="subtitle2" className={styles.commonBasesTitle}>
-          Common bases
-        </Typography>
+        <Typography variant="caption">Common bases</Typography>
         {/* Common token */}
         {tokenBase?.length != 0 && (
           <CommonBases
@@ -211,6 +224,7 @@ function TokenListItem({
   isCommonBase: Boolean;
 }) {
   const styles = useStyles();
+  const theme = useTheme();
   const mint = new PublicKey(tokenInfo.address);
 
   const { ownedTokensDetailed } = useTokenListContext();
@@ -223,28 +237,28 @@ function TokenListItem({
       <div onClick={() => onClick(mint)} className={styles.tokenSelector}>
         <TokenIcon
           mint={mint}
-          style={{ width: "30px", borderRadius: "15px" }}
+          style={{ width: theme.spacing(4), height: theme.spacing(4) }}
         />
         <TokenName tokenInfo={tokenInfo} />
       </div>
       {/* Token quantity and price */}
-      {+details?.balance > 0 && (
+      {+details?.balance > 0 ? (
         <Box mr={1} textAlign="end">
           <ListItemText
             primary={details?.balance}
             secondary={`$${details?.usd}`}
           />
         </Box>
+      ) : (
+        // Add as common base button
+        <IconButton
+          onClick={() =>
+            isCommonBase ? removeBase(tokenInfo) : addNewBase(tokenInfo)
+          }
+        >
+          {isCommonBase ? <Star /> : <StarOutline />}
+        </IconButton>
       )}
-      {/* Add as common base button */}
-      <IconButton
-        aria-label="is-common-base"
-        onClick={() =>
-          isCommonBase ? removeBase(tokenInfo) : addNewBase(tokenInfo)
-        }
-      >
-        {isCommonBase ? <Star /> : <StarOutline />}
-      </IconButton>
     </ListItem>
   );
 }
@@ -271,7 +285,7 @@ function CommonBases({
 }) {
   const styles = useStyles();
   return (
-    <Grid container>
+    <Box display="flex" flexWrap="wrap" className={styles.chip}>
       {commonTokenBases?.map((tokenInfo: TokenInfo) => {
         const mint = new PublicKey(tokenInfo.address);
         return (
@@ -281,10 +295,9 @@ function CommonBases({
             variant="outlined"
             label={tokenInfo?.symbol}
             onClick={() => onClick(mint)}
-            className={styles.chip}
           />
         );
       })}
-    </Grid>
+    </Box>
   );
 }

@@ -27,8 +27,9 @@ import {
   Link,
   IconButton,
   Popover,
+  Avatar,
 } from "@material-ui/core";
-import { ExpandMore, ImportExportRounded, Info } from "@material-ui/icons";
+import { ExpandMore, ImportExportRounded } from "@material-ui/icons";
 import {
   useIsUnwrapSollet,
   useCanCreateAccounts,
@@ -327,7 +328,8 @@ export function SwapTokenForm({
               <small>Balance:&nbsp;</small>
             </Typography>
             {/* <Typography color="textSecondary"> */}
-            {balance?.toFixed(mintAccount.decimals)} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            {balance?.toFixed(mintAccount.decimals)}{" "}
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
             {/* </Typography> */}
           </Box>
         ) : (
@@ -372,14 +374,17 @@ function TokenButton({
 
   return (
     <div onClick={onClick} className={styles.tokenButton}>
-      <TokenIcon mint={mint} style={{ width: theme.spacing(4) }} />
+      <TokenIcon
+        mint={mint}
+        style={{ width: theme.spacing(4), height: theme.spacing(4) }}
+      />
       <TokenName mint={mint} style={{ fontSize: 14, fontWeight: 700 }} />
       <ExpandMore />
     </div>
   );
 }
 
-export function TokenIcon({ mint, style }: { mint: PublicKey; style: any }) {
+export function TokenIcon({ mint, style }: { mint: PublicKey; style?: any }) {
   const tokenMap = useTokenMap();
   let tokenInfo = tokenMap.get(mint.toString());
   return (
@@ -390,11 +395,7 @@ export function TokenIcon({ mint, style }: { mint: PublicKey; style: any }) {
         flexDirection: "column",
       }}
     >
-      {tokenInfo?.logoURI ? (
-        <img alt="Logo" style={style} src={tokenInfo?.logoURI} />
-      ) : (
-        <div style={style}></div>
-      )}
+      <Avatar alt={tokenInfo?.name} style={style} src={tokenInfo?.logoURI} />
     </div>
   );
 }
