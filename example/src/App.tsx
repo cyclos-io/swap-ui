@@ -127,6 +127,7 @@ function AppInner() {
           tokenList={tokenList}
           commonBases={commonBases}
           referral={ref}
+          connectWalletCallback={() => wallet.connect()}
         />
       )}
     </Grid>

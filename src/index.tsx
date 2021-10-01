@@ -49,6 +49,8 @@ export default function Swap(props: SwapProps): ReactElement {
     containerStyle,
     contentStyle,
     swapTokenContainerStyle,
+    swapButtonStyle,
+    connectWalletCallback,
     materialTheme,
     provider,
     tokenList,
@@ -99,6 +101,8 @@ export default function Swap(props: SwapProps): ReactElement {
                 containerStyle={containerStyle}
                 contentStyle={contentStyle}
                 swapTokenContainerStyle={swapTokenContainerStyle}
+                swapButtonStyle={swapButtonStyle}
+                connectWalletCallback={connectWalletCallback}
               />
             </SwapContextProvider>
           </DexContextProvider>
@@ -177,6 +181,14 @@ export type SwapProps = {
    * Styling properties for the from and to token containers.
    */
   swapTokenContainerStyle?: any;
+  /**
+   * Styling properties for the Swap Button.
+   */
+   swapButtonStyle?: any;
+  /**
+   * Callback for wallet connection
+   */
+   connectWalletCallback?: any;
 };
 
 export {

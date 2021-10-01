@@ -24,7 +24,11 @@ const useStyles = makeStyles((theme) => ({
   table: {},
   settingsButton: {
     padding: 0,
-    color: theme.palette.primary.main,
+    marginBottom: "4px",
+    "& *": {
+      fontSize: theme.spacing(2),
+    },
+    // color: theme.palette.primary.main,
   },
   closeAccountSwitchLabel: {
     color: theme.palette.text.secondary,
@@ -65,12 +69,12 @@ export function SettingsButton() {
             <Popover
               {...bindPopover(popupState)}
               anchorOrigin={{
-                vertical: "bottom",
-                horizontal: "left",
+                vertical: "top",
+                horizontal: "center",
               }}
               transformOrigin={{
-                vertical: "top",
-                horizontal: "right",
+                vertical: "bottom",
+                horizontal: "center",
               }}
               PaperProps={{
                 style: {

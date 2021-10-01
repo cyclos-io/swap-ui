@@ -24,8 +24,11 @@ import {
   TextField,
   useTheme,
   Box,
+  Link,
+  IconButton,
+  Popover,
 } from "@material-ui/core";
-import { ExpandMore, ImportExportRounded } from "@material-ui/icons";
+import { ExpandMore, ImportExportRounded, Info } from "@material-ui/icons";
 import {
   useIsUnwrapSollet,
   useCanCreateAccounts,
@@ -40,6 +43,9 @@ import {
   useMarket,
   FEE_MULTIPLIER,
   _DexContext,
+  useRoute,
+  useMarketName,
+  useBbo,
 } from "../context/Dex";
 import { useTokenMap } from "../context/TokenList";
 import {
@@ -52,7 +58,7 @@ import {
 import { useCanSwap, useReferral, useIsWrapSol } from "../context/Swap";
 import TokenDialog from "./TokenDialog";
 import { SettingsButton } from "./Settings";
-import { InfoLabel } from "./Info";
+import { InfoButton, InfoLabel } from "./Info";
 import {
   SOL_MINT,
   WRAPPED_SOL_MINT,
@@ -62,6 +68,7 @@ import {
 } from "../utils/pubkeys";
 import { getTokenAddrressAndCreateIx } from "../utils/tokens";
 import { TokenInfo } from "@solana/spl-token-registry";
+import PopupState, { bindTrigger, bindPopover } from "material-ui-popup-state";
 
 const useStyles = makeStyles((theme) => ({
   card: {
@@ -109,7 +116,8 @@ const useStyles = makeStyles((theme) => ({
     borderRadius: theme.spacing(2),
     boxShadow: "0px 0px 15px 2px rgba(33,150,243,0.1)",
     display: "flex",
-    justifyContent: "space-between",
+    flexDirection: "column",
+    justifyContent: "space-around",
     padding: theme.spacing(1),
   },
   swapTokenSelectorContainer: {
@@ -121,14 +129,19 @@ const useStyles = makeStyles((theme) => ({
   balanceContainer: {
     display: "flex",
     alignItems: "center",
+    justifyContent: "space-between",
+    marginLeft: theme.spacing(1),
+    marginRight: theme.spacing(0.5),
     fontSize: "14px",
   },
   maxButton: {
-    marginLeft: theme.spacing(1),
+    marginLeft: theme.spacing(2),
     color: theme.palette.primary.main,
     fontWeight: 700,
     fontSize: "12px",
-    cursor: "pointer",
+    textTransform: "none",
+    maxWidth: "min-content",
+    minWidth: "min-content",
   },
   tokenButton: {
     display: "flex",
@@ -136,16 +149,25 @@ const useStyles = makeStyles((theme) => ({
     cursor: "pointer",
     marginBottom: theme.spacing(1),
   },
+  infoButton: {
+    marginLeft: "5px",
+    padding: 0,
+    fontSize: "14px",
+  },
 }));
 
 export default function SwapCard({
   containerStyle,
   contentStyle,
   swapTokenContainerStyle,
+  swapButtonStyle,
+  connectWalletCallback,
 }: {
   containerStyle?: any;
   contentStyle?: any;
   swapTokenContainerStyle?: any;
+  swapButtonStyle?: any;
+  connectWalletCallback?: any;
 }) {
   const styles = useStyles();
   return (
@@ -156,13 +178,19 @@ export default function SwapCard({
         <ArrowButton style={swapTokenContainerStyle} />
         <SwapToForm style={swapTokenContainerStyle} />
         <InfoLabel />
-        <SwapButton />
+        <SwapButton
+          swapButtonStyle={swapButtonStyle}
+          connectWalletCallback={connectWalletCallback}
+        />
       </div>
     </Card>
   );
 }
 
 export function SwapHeader() {
+  const { fromMint, toMint } = useSwapContext();
+  // Use last route item to find impact
+  const route = useRoute(fromMint, toMint);
   return (
     <div
       style={{
@@ -179,7 +207,7 @@ export function SwapHeader() {
       >
         SWAP
       </Typography>
-      <SettingsButton />
+      <InfoButton route={route} />
     </div>
   );
 }
@@ -275,34 +303,58 @@ export function SwapTokenForm({
 
   return (
     <div className={styles.swapTokenFormContainer} style={style}>
-      <div className={styles.swapTokenSelectorContainer}>
-        <TokenButton mint={mint} onClick={() => setShowTokenDialog(true)} />
-        <Typography color="textSecondary" className={styles.balanceContainer}>
-          {tokenAccount && mintAccount
-            ? `Balance: ${balance?.toFixed(mintAccount.decimals)}`
-            : `-`}
-          {from && !!balance ? (
-            <span
+      <Box display="flex" justifyContent="space-between">
+        <Box className={styles.swapTokenSelectorContainer}>
+          <TokenButton mint={mint} onClick={() => setShowTokenDialog(true)} />
+        </Box>
+        <TextField
+          type="number"
+          value={formattedAmount}
+          onChange={(e) => setAmount(parseFloat(e.target.value))}
+          InputProps={{
+            disableUnderline: true,
+            classes: {
+              root: styles.amountInput,
+              input: styles.input,
+            },
+          }}
+        />
+      </Box>
+      <Box className={styles.balanceContainer}>
+        {tokenAccount && mintAccount ? (
+          <Box>
+            <Typography variant="caption">
+              <small>Balance:&nbsp;</small>
+            </Typography>
+            {/* <Typography color="textSecondary"> */}
+            {balance?.toFixed(mintAccount.decimals)} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            {/* </Typography> */}
+          </Box>
+        ) : (
+          `-`
+        )}
+        {!!balance && (
+          <div>
+            <Button
+              variant="text"
+              size="small"
+              className={styles.maxButton}
+              onClick={() => setAmount(balance / 2)}
+            >
+              Half
+            </Button>
+            <Button
+              variant="text"
+              size="small"
               className={styles.maxButton}
               onClick={() => setAmount(balance)}
             >
-              MAX
-            </span>
-          ) : null}
-        </Typography>
-      </div>
-      <TextField
-        type="number"
-        value={formattedAmount}
-        onChange={(e) => setAmount(parseFloat(e.target.value))}
-        InputProps={{
-          disableUnderline: true,
-          classes: {
-            root: styles.amountInput,
-            input: styles.input,
-          },
-        }}
-      />
+              Max
+            </Button>
+          </div>
+        )}
+      </Box>
+
       {tokenDialog}
     </div>
   );
@@ -364,7 +416,13 @@ function TokenName({ mint, style }: { mint: PublicKey; style: any }) {
   );
 }
 
-export function SwapButton() {
+export function SwapButton({
+  swapButtonStyle,
+  connectWalletCallback,
+}: {
+  swapButtonStyle?: any;
+  connectWalletCallback?: any;
+}) {
   const styles = useStyles();
   const {
     fromMint,
@@ -834,10 +892,11 @@ export function SwapButton() {
       <Button
         variant="contained"
         className={styles.swapButton}
-        onClick={sendCreateAccountsTransaction}
-        disabled={true}
+        onClick={connectWalletCallback}
+        disabled={!connectWalletCallback}
+        style={swapButtonStyle}
       >
-        Disconnected
+        {!!connectWalletCallback ? "Connect Wallet" : "Disconnected"}
       </Button>
     );
   }
@@ -848,14 +907,20 @@ export function SwapButton() {
         className={styles.swapButton}
         onClick={sendSwapTransaction}
         disabled={true}
+        style={swapButtonStyle}
       >
-        Loading
+        Loading...
       </Button>
     );
   }
 
   return !fromWallet || insufficientBalance ? (
-    <Button variant="contained" className={styles.swapButton} disabled={true}>
+    <Button
+      variant="contained"
+      className={styles.swapButton}
+      style={swapButtonStyle}
+      disabled={true}
+    >
       Insufficient balance
     </Button>
   ) : needsCreateAccounts ? (
@@ -864,6 +929,7 @@ export function SwapButton() {
       className={styles.swapButton}
       onClick={sendCreateAccountsTransaction}
       disabled={!canCreateAccounts}
+      style={swapButtonStyle}
     >
       Create Accounts
     </Button>
@@ -871,6 +937,7 @@ export function SwapButton() {
     <Button
       variant="contained"
       className={styles.swapButton}
+      style={swapButtonStyle}
       onClick={sendWrapSolTransaction}
       disabled={!canWrapOrUnwrap}
     >
@@ -881,6 +948,7 @@ export function SwapButton() {
       variant="contained"
       className={styles.swapButton}
       onClick={sendUnwrapSolTransaction}
+      style={swapButtonStyle}
       disabled={!canWrapOrUnwrap}
     >
       Unwrap SOL
@@ -891,6 +959,7 @@ export function SwapButton() {
       className={styles.swapButton}
       onClick={sendUnwrapSolletTransaction}
       disabled={fromAmount <= 0}
+      style={swapButtonStyle}
     >
       Unwrap
     </Button>
@@ -900,6 +969,7 @@ export function SwapButton() {
       className={styles.swapButton}
       onClick={sendSwapTransaction}
       disabled={true}
+      style={swapButtonStyle}
     >
       Min {minSwapAmount} Required
     </Button>
@@ -909,6 +979,7 @@ export function SwapButton() {
       className={styles.swapButton}
       onClick={sendSwapTransaction}
       disabled={!canSwap}
+      style={swapButtonStyle}
     >
       Swap
     </Button>
