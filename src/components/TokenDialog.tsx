@@ -1,35 +1,35 @@
-import { forwardRef, useState } from "react";
-import { PublicKey } from "@solana/web3.js";
-import { TokenInfo } from "@solana/spl-token-registry";
 import {
-  makeStyles,
+  Avatar,
+  Box,
+  Chip,
   Dialog,
-  DialogTitle,
-  DialogContent,
   DialogActions,
-  TextField,
+  DialogContent,
+  DialogTitle,
+  Grow,
+  IconButton,
   List,
   ListItem,
-  Typography,
-  Chip,
-  Avatar,
-  Tabs,
-  Tab,
   ListItemText,
-  Box,
-  IconButton,
+  makeStyles,
+  Tab,
+  Tabs,
+  TextField,
+  Typography,
   useMediaQuery,
-  Grow,
   useTheme,
 } from "@material-ui/core";
-import { StarOutline, Star, CloseRounded } from "@material-ui/icons";
-import { TokenIcon } from "./Swap";
+import { TransitionProps } from "@material-ui/core/transitions";
+import { CloseRounded, Star, StarOutline } from "@material-ui/icons";
+import { TokenInfo } from "@solana/spl-token-registry";
+import { PublicKey } from "@solana/web3.js";
+import { forwardRef, useState } from "react";
 import {
   useSwappableTokens,
   useTokenBase,
   useTokenListContext,
 } from "../context/TokenList";
-import { TransitionProps } from "@material-ui/core/transitions";
+import { TokenIcon } from "./Swap";
 
 const useStyles = makeStyles((theme) => ({
   dialogContent: {

@@ -1,20 +1,20 @@
-import { useState } from "react";
 import {
-  makeStyles,
-  Popover,
-  IconButton,
-  Typography,
   Button,
-  TextField,
-  InputAdornment,
-  Switch,
   FormControlLabel,
   FormGroup,
+  IconButton,
+  InputAdornment,
+  makeStyles,
+  Popover,
+  Switch,
+  TextField,
+  Typography,
 } from "@material-ui/core";
 import { SettingsOutlined as Settings } from "@material-ui/icons";
-import PopupState, { bindTrigger, bindPopover } from "material-ui-popup-state";
-import { useSwapContext, useSwapFair } from "../context/Swap";
+import PopupState, { bindPopover, bindTrigger } from "material-ui-popup-state";
+import { useState } from "react";
 import { useDexContext } from "../context/Dex";
+import { useSwapContext, useSwapFair } from "../context/Swap";
 import OpenOrdersDialog from "./OpenOrdersDialog";
 
 const useStyles = makeStyles((theme) => ({

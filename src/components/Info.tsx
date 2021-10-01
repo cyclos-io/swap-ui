@@ -1,26 +1,26 @@
 import {
-  makeStyles,
-  Typography,
-  Link,
-  Popover,
-  IconButton,
-  Divider,
-  Theme,
   Box,
+  Divider,
+  IconButton,
+  Link,
+  makeStyles,
+  Popover,
+  Theme,
+  Typography,
   useTheme,
 } from "@material-ui/core";
 import { InfoOutlined, SwapHorizRounded } from "@material-ui/icons";
-import PopupState, { bindTrigger, bindPopover } from "material-ui-popup-state";
 import { PublicKey } from "@solana/web3.js";
-import { useTokenMap } from "../context/TokenList";
-import { getSwapFair, useSwapContext, useSwapFair } from "../context/Swap";
-import { useMint } from "../context/Token";
+import PopupState, { bindPopover, bindTrigger } from "material-ui-popup-state";
 import {
-  useRoute,
-  useMarketName,
   useBbo,
+  useMarketName,
   usePriceImpact,
+  useRoute,
 } from "../context/Dex";
+import { getSwapFair, useSwapContext } from "../context/Swap";
+import { useMint } from "../context/Token";
+import { useTokenMap } from "../context/TokenList";
 import { SettingsButton } from "./Settings";
 
 const useStyles = makeStyles((theme: Theme) => ({
@@ -99,7 +99,7 @@ export function InfoLabel() {
       <Divider />
       <div className={styles.infoLabel}>
         <Typography color="textSecondary" style={{ fontSize: "14px" }}>
-          Price impact:&nbsp;
+          Price Impact:&nbsp;
         </Typography>
         <Typography
           style={{ fontSize: "14px", fontWeight: 500 }}

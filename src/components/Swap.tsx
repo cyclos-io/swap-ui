@@ -1,54 +1,50 @@
-import { useState, useMemo } from "react";
 import {
-  PublicKey,
-  Keypair,
-  Transaction,
-  SystemProgram,
-  Signer,
-  SYSVAR_RENT_PUBKEY,
-  TransactionInstruction,
-} from "@solana/web3.js";
-import {
-  u64,
-  Token,
-  TOKEN_PROGRAM_ID,
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-} from "@solana/spl-token";
-import { OpenOrders } from "@project-serum/serum";
-import { BN, Provider } from "@project-serum/anchor";
-import {
-  makeStyles,
-  Card,
-  Button,
-  Typography,
-  TextField,
-  useTheme,
-  Box,
-  Link,
-  IconButton,
-  Popover,
   Avatar,
+  Box,
+  Button,
+  Card,
+  makeStyles,
+  TextField,
+  Typography,
+  useTheme,
 } from "@material-ui/core";
 import { ExpandMore, ImportExportRounded } from "@material-ui/icons";
+import { BN, Provider } from "@project-serum/anchor";
+import { OpenOrders } from "@project-serum/serum";
 import {
-  useIsUnwrapSollet,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  Token,
+  TOKEN_PROGRAM_ID,
+  u64,
+} from "@solana/spl-token";
+import {
+  Keypair,
+  PublicKey,
+  Signer,
+  SystemProgram,
+  SYSVAR_RENT_PUBKEY,
+  Transaction,
+  TransactionInstruction,
+} from "@solana/web3.js";
+import { useMemo, useState } from "react";
+import {
+  FEE_MULTIPLIER,
+  useDexContext,
+  useMarket,
+  useRoute,
+  useRouteVerbose,
+} from "../context/Dex";
+import {
   useCanCreateAccounts,
+  useCanSwap,
   useCanWrapOrUnwrap,
+  useIsUnwrapSollet,
+  useIsWrapSol,
+  useMinSwapAmount,
+  useReferral,
   useSwapContext,
   useSwapFair,
-  useMinSwapAmount,
 } from "../context/Swap";
-import {
-  useDexContext,
-  useRouteVerbose,
-  useMarket,
-  FEE_MULTIPLIER,
-  _DexContext,
-  useRoute,
-  useMarketName,
-  useBbo,
-} from "../context/Dex";
-import { useTokenMap } from "../context/TokenList";
 import {
   addTokensToCache,
   CachedToken,
@@ -56,20 +52,17 @@ import {
   useOwnedTokenAccount,
   useTokenContext,
 } from "../context/Token";
-import { useCanSwap, useReferral, useIsWrapSol } from "../context/Swap";
-import TokenDialog from "./TokenDialog";
-import { SettingsButton } from "./Settings";
-import { InfoButton, InfoLabel } from "./Info";
+import { useTokenMap } from "../context/TokenList";
 import {
-  SOL_MINT,
-  WRAPPED_SOL_MINT,
   DEX_PID,
   MEMO_PROGRAM_ID,
   SOLLET_USDT_MINT,
+  SOL_MINT,
+  WRAPPED_SOL_MINT,
 } from "../utils/pubkeys";
 import { getTokenAddrressAndCreateIx } from "../utils/tokens";
-import { TokenInfo } from "@solana/spl-token-registry";
-import PopupState, { bindTrigger, bindPopover } from "material-ui-popup-state";
+import { InfoButton, InfoLabel } from "./Info";
+import TokenDialog from "./TokenDialog";
 
 const useStyles = makeStyles((theme) => ({
   card: {
@@ -134,6 +127,7 @@ const useStyles = makeStyles((theme) => ({
     marginLeft: theme.spacing(1),
     marginRight: theme.spacing(0.5),
     fontSize: "14px",
+    minHeight: theme.spacing(3.8),
   },
   maxButton: {
     marginLeft: theme.spacing(2),
@@ -328,8 +322,7 @@ export function SwapTokenForm({
               <small>Balance:&nbsp;</small>
             </Typography>
             {/* <Typography color="textSecondary"> */}
-            {balance?.toFixed(mintAccount.decimals)}{" "}
-            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            {balance?.toFixed(mintAccount.decimals)}
             {/* </Typography> */}
           </Box>
         ) : (

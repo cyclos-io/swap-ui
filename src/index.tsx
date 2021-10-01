@@ -1,26 +1,13 @@
-import { ReactElement } from "react";
-import { PublicKey } from "@solana/web3.js";
-import { TokenListContainer } from "@solana/spl-token-registry";
-import { Provider } from "@project-serum/anchor";
-import { Swap as SwapClient } from "@project-serum/swap";
 import {
   createTheme,
   ThemeOptions,
   ThemeProvider,
 } from "@material-ui/core/styles";
-import {
-  SwapContextProvider,
-  useSwapContext,
-  useSwapFair,
-} from "./context/Swap";
-import {
-  DexContextProvider,
-  useBbo,
-  useFairRoute,
-  useMarketName,
-} from "./context/Dex";
-import { TokenListContextProvider, useTokenMap } from "./context/TokenList";
-import { TokenContextProvider, useMint } from "./context/Token";
+import { Provider } from "@project-serum/anchor";
+import { Swap as SwapClient } from "@project-serum/swap";
+import { TokenListContainer } from "@solana/spl-token-registry";
+import { PublicKey } from "@solana/web3.js";
+import { ReactElement } from "react";
 import SwapCard, {
   ArrowButton,
   SwapButton,
@@ -28,6 +15,19 @@ import SwapCard, {
   SwapTokenForm,
 } from "./components/Swap";
 import TokenDialog from "./components/TokenDialog";
+import {
+  DexContextProvider,
+  useBbo,
+  useFairRoute,
+  useMarketName,
+} from "./context/Dex";
+import {
+  SwapContextProvider,
+  useSwapContext,
+  useSwapFair,
+} from "./context/Swap";
+import { TokenContextProvider, useMint } from "./context/Token";
+import { TokenListContextProvider, useTokenMap } from "./context/TokenList";
 
 /**
  * A`Swap` component that can be embedded into applications. To use,
@@ -192,7 +192,6 @@ export type SwapProps = {
 };
 
 export {
-  // Components.
   Swap,
   SwapCard,
   SwapHeader,
