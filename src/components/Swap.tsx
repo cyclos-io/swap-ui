@@ -23,6 +23,7 @@ import {
   Typography,
   TextField,
   useTheme,
+  Box,
 } from "@material-ui/core";
 import { ExpandMore, ImportExportRounded } from "@material-ui/icons";
 import {
@@ -90,8 +91,12 @@ const useStyles = makeStyles((theme) => ({
   },
   swapToFromButton: {
     display: "block",
-    margin: "10px auto 10px auto",
+    margin: "0px auto 0px auto",
     cursor: "pointer",
+    backgroundColor: theme.palette.background.paper,
+    borderRadius: theme.spacing(1),
+    boxShadow: "0px 0px 2px 1px rgba(33,150,243,0.1)",
+    fontSize: theme.spacing(4),
   },
   amountInput: {
     fontSize: 22,
@@ -148,7 +153,7 @@ export default function SwapCard({
       <SwapHeader />
       <div style={contentStyle}>
         <SwapFromForm style={swapTokenContainerStyle} />
-        <ArrowButton />
+        <ArrowButton style={swapTokenContainerStyle} />
         <SwapToForm style={swapTokenContainerStyle} />
         <InfoLabel />
         <SwapButton />
@@ -179,17 +184,20 @@ export function SwapHeader() {
   );
 }
 
-export function ArrowButton() {
+export function ArrowButton({ style }: { style?: any }) {
   const styles = useStyles();
   const theme = useTheme();
   const { swapToFromMints } = useSwapContext();
   return (
-    <ImportExportRounded
-      className={styles.swapToFromButton}
-      fontSize="large"
-      htmlColor={theme.palette.primary.main}
-      onClick={swapToFromMints}
-    />
+    <Box my={-1} position="relative">
+      <ImportExportRounded
+        className={styles.swapToFromButton}
+        fontSize="large"
+        style={style}
+        htmlColor={theme.palette.primary.main}
+        onClick={swapToFromMints}
+      />
+    </Box>
   );
 }
 
