@@ -1,5 +1,6 @@
 import {
   Avatar,
+  Badge,
   Box,
   Chip,
   Dialog,
@@ -63,6 +64,14 @@ const useStyles = makeStyles((theme) => ({
     width: "100%",
     cursor: "pointer",
   },
+  closeIcon: {
+    backgroundColor: theme.palette.text.secondary,
+    color: theme.palette.getContrastText(theme.palette.text.secondary),
+    fontSize: theme.spacing(1.5),
+    borderRadius: "50%",
+    padding: theme.spacing(0.3),
+  },
+  badge: {},
 }));
 
 const Transition = forwardRef(function Transition(
@@ -133,6 +142,7 @@ export default function TokenDialog({
         {/* Token search */}
         <TextField
           className={styles.textField}
+          autoFocus
           placeholder={"Search name"}
           value={tokenFilter}
           size="small"
@@ -146,6 +156,7 @@ export default function TokenDialog({
         {tokenBase?.length != 0 && (
           <CommonBases
             commonTokenBases={tokenBase}
+            removeBase={removeBase}
             onClick={(mint) => {
               setMint(mint);
               onClose();
@@ -251,12 +262,12 @@ function TokenListItem({
         </Box>
       ) : (
         // Add as common base button
-        <IconButton
+        <IconButton size="small"
           onClick={() =>
             isCommonBase ? removeBase(tokenInfo) : addNewBase(tokenInfo)
           }
         >
-          {isCommonBase ? <Star /> : <StarOutline />}
+          {isCommonBase ? <Star fontSize="small"/> : <StarOutline fontSize="small" />}
         </IconButton>
       )}
     </ListItem>
@@ -279,23 +290,51 @@ function TokenName({ tokenInfo }: { tokenInfo: TokenInfo }) {
 function CommonBases({
   commonTokenBases,
   onClick,
+  removeBase,
 }: {
   commonTokenBases: TokenInfo[] | undefined;
   onClick: (mint: PublicKey) => void;
+  removeBase: (token: TokenInfo) => void;
 }) {
   const styles = useStyles();
+
+  const [hovered, setHovered] = useState("");
+
   return (
     <Box display="flex" flexWrap="wrap" className={styles.chip}>
       {commonTokenBases?.map((tokenInfo: TokenInfo) => {
         const mint = new PublicKey(tokenInfo.address);
         return (
-          <Chip
-            key={tokenInfo.address}
-            avatar={<Avatar alt={tokenInfo?.name} src={tokenInfo?.logoURI} />}
-            variant="outlined"
-            label={tokenInfo?.symbol}
-            onClick={() => onClick(mint)}
-          />
+          <Box
+            onMouseEnter={() => {
+              setHovered(tokenInfo?.symbol);
+            }}
+            onMouseLeave={() => {
+              setHovered("");
+            }}
+          >
+            <Badge
+              badgeContent={
+                <CloseRounded
+                  className={styles.closeIcon}
+                  onClick={() => removeBase(tokenInfo)}
+                />
+              }
+              className={styles.badge}
+              invisible={hovered !== tokenInfo?.symbol}
+            >
+              <Chip
+                key={tokenInfo.address}
+                avatar={
+                  <Avatar alt={tokenInfo?.name} src={tokenInfo?.logoURI} />
+                }
+                variant="outlined"
+                label={tokenInfo?.symbol}
+                onClick={() => onClick(mint)}
+                style={{ borderRadius: 4 }}
+              />
+            </Badge>
+          </Box>
         );
       })}
     </Box>
