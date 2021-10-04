@@ -188,7 +188,7 @@ function OpenOrdersRow({
       <TableCell component="th" scope="row">
         <Typography>
           <Link
-            href={`https://dex.projectserum.com/#/market/${market.toString()}`}
+            href={`https://dex.cyclos.io/#/market/${market.toString()}`}
             target="_blank"
             rel="noopener"
           >
