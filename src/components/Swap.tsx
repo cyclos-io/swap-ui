@@ -26,7 +26,8 @@ import {
   Transaction,
   TransactionInstruction,
 } from "@solana/web3.js";
-import { useMemo, useState } from "react";
+import useInterval from "@use-it/interval";
+import { useEffect, useMemo, useState } from "react";
 import {
   FEE_MULTIPLIER,
   useDexContext,
@@ -46,10 +47,12 @@ import {
   useSwapFair,
 } from "../context/Swap";
 import {
-  addTokensToCache,
+  // addTokensToCache,
+  
   CachedToken,
   useMint,
   useOwnedTokenAccount,
+  usePollForBalance,
   useTokenContext,
 } from "../context/Token";
 import { useTokenMap } from "../context/TokenList";
@@ -165,6 +168,8 @@ export default function SwapCard({
   connectWalletCallback?: any;
 }) {
   const styles = useStyles();
+  usePollForBalance();
+  
   return (
     <Card className={styles.card} style={containerStyle}>
       <SwapHeader />
@@ -268,10 +273,11 @@ export function SwapTokenForm({
   setAmount: (a: number) => void;
 }) {
   const styles = useStyles();
-
+  const { provider, userTokens, setUserTokens } = useTokenContext();
   const [showTokenDialog, setShowTokenDialog] = useState(false);
+
   const tokenAccount = useOwnedTokenAccount(mint);
-  const mintAccount = useMint(mint);
+  const mintAccount = useMint(mint);  
 
   const balance =
     tokenAccount &&
@@ -433,7 +439,7 @@ export function SwapButton({
     addOpenOrderAccount,
     openOrders,
   } = useDexContext();
-  const { isLoaded: isTokensLoaded, refreshTokenState } = useTokenContext();
+  const { isLoaded: isTokensLoaded } = useTokenContext();
   const tokenMap = useTokenMap();
 
   // Token to be traded away
@@ -623,10 +629,11 @@ export function SwapButton({
           )
         );
       }
-      addTokensToCache(tokensToAdd);
+      // addTokensToCache(tokensToAdd);
 
       // Refresh UI to display balance of the created token account
-      refreshTokenState();
+      // refreshTokenState();
+
     } catch (error) {}
   };
 
