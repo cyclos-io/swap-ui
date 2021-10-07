@@ -163,8 +163,8 @@ function OpenOrdersRow({
       await marketClient.makeSettleFundsTransaction(
         swapClient.program.provider.connection,
         ooAccount,
-        baseWallet.publicKey,
-        quoteWallet.publicKey,
+        new PublicKey(baseWallet.tokenAccount),
+        new PublicKey(quoteWallet.tokenAccount),
         referrerWallet
       );
     await swapClient.program.provider.send(transaction, signers);

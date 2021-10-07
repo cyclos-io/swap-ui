@@ -262,12 +262,17 @@ function TokenListItem({
         </Box>
       ) : (
         // Add as common base button
-        <IconButton size="small"
+        <IconButton
+          size="small"
           onClick={() =>
             isCommonBase ? removeBase(tokenInfo) : addNewBase(tokenInfo)
           }
         >
-          {isCommonBase ? <Star fontSize="small"/> : <StarOutline fontSize="small" />}
+          {isCommonBase ? (
+            <Star fontSize="small" />
+          ) : (
+            <StarOutline fontSize="small" />
+          )}
         </IconButton>
       )}
     </ListItem>

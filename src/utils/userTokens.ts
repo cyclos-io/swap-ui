@@ -43,3 +43,47 @@ export const getUserTokens = async (
 
   return data.filter((t: OwnedTokenDetailed) => +t.balance > 0);
 };
+
+type SolscanToken = {
+  tokenAddress: string;
+  tokenAccount: string;
+  tokenSymbol: string;
+  tokenAmount: {
+    uiAmount: number;
+  };
+  priceUsdt?: number;
+};
+
+export type SavedTokenInfo = {
+  tokenAccount: string;
+  tokenSymbol: string;
+  tokenAmount: number;
+  priceUsdt?: number;
+};
+
+export type FetchedTokens = {
+  [tokenAddress: string]: SavedTokenInfo | undefined;
+};
+
+export async function fetchUserTokens(address: string) {
+  const tokens = await (
+    await fetch(
+      `https://api.solscan.io/account/tokens?address=${address}&price=1`
+    )
+  ).json();
+  const tokenData = tokens.data as SolscanToken[];
+
+  const userTokens: FetchedTokens = {};
+
+  tokenData.forEach((token) => {
+    const { tokenAddress, tokenAccount, tokenSymbol, tokenAmount, priceUsdt } =
+      token;
+    userTokens[tokenAddress] = {
+      tokenAccount,
+      tokenSymbol,
+      tokenAmount: tokenAmount.uiAmount,
+      priceUsdt,
+    };
+  });
+  return userTokens;
+}

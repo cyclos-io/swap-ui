@@ -1,91 +1,72 @@
-import React, { useContext, useState, useEffect } from "react";
+import React, { useContext, useState } from "react";
 import { useAsync } from "react-async-hook";
-import { Provider, BN } from "@project-serum/anchor";
-import { PublicKey, Account, Keypair } from "@solana/web3.js";
-import {
-  MintInfo,
-  AccountInfo as TokenAccountInfo,
-  Token,
-  TOKEN_PROGRAM_ID,
-} from "@solana/spl-token";
-import {
-  getOwnedAssociatedTokenAccounts,
-  parseTokenAccountData,
-} from "../utils/tokens";
-import { SOL_MINT } from "../utils/pubkeys";
-import { token } from "@project-serum/anchor/dist/utils";
+import { Provider } from "@project-serum/anchor";
+import { PublicKey, Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { MintInfo, Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import useInterval from "@use-it/interval";
-import { useSwapContext } from "..";
 
-export type CachedToken = {
-  publicKey: PublicKey; // Token account address for user, TODO read from account directly
-  account: TokenAccountInfo;
-};
+import { SOL_MINT } from "../utils/pubkeys";
+import {
+  FetchedTokens,
+  fetchSolPrice,
+  fetchUserTokens,
+  SavedTokenInfo,
+} from "../utils/userTokens";
 
 export type TokenContext = {
   provider: Provider;
-  isLoaded: boolean;
-
-  // TODO store as map instead of array
-  userTokens: CachedToken[],
-  setUserTokens: React.Dispatch<React.SetStateAction<CachedToken[]>>;
+  userTokens?: FetchedTokens;
 };
 
 const _TokenContext = React.createContext<TokenContext | null>(null);
+
 /**
- * Observe token balances of the user using websockets
- * Expose function to allow balances to be refetched
- * @param props 
- * @returns 
+ * Provider for user token balances
+ * Token balances are polled at fixed intervals
+ * @returns
  */
-export function TokenContextProvider({provider, children}: {provider: Provider, children: React.ReactNode}) {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [userTokens, setUserTokens] = useState<CachedToken[]>([])
+export function TokenContextProvider({
+  provider,
+  children,
+}: {
+  provider: Provider;
+  children: React.ReactNode;
+}) {
+  const [userTokens, setUserTokens] = useState<FetchedTokens>();
+  const poll = provider.wallet.publicKey && provider.connection;
+  const pollDuration = poll
+    ? !userTokens // no delay for first fetch
+      ? 0
+      : 5000
+    : null;
 
-  // Fetch all the owned token accounts for the wallet.
-  useEffect(() => {
-    if (!provider.wallet.publicKey) {
-      return;
+  useInterval(async () => {
+    try {
+      const fetchedTokens = await fetchUserTokens(
+        provider.wallet.publicKey.toString()
+      );
+      // Add SOL to token list
+      const lamportsBal = await provider.connection.getBalance(
+        provider.wallet.publicKey
+      );
+      fetchedTokens[SOL_MINT.toString()] = {
+        tokenAccount: "",
+        tokenSymbol: "SOL",
+        tokenAmount: lamportsBal / LAMPORTS_PER_SOL,
+        priceUsdt: await fetchSolPrice(),
+      };
+
+      setUserTokens(fetchedTokens);
+    } catch (error) {
+      console.error(error);
     }
-
-    // Fetch all SPL tokens belonging to the user
-    getOwnedAssociatedTokenAccounts(
-      provider.connection,
-      provider.wallet.publicKey
-    ).then((accs) => {
-      if (accs) {
-        // @ts-ignore
-        setUserTokens(accs);
-      }
-      setIsLoaded(true);
-    });
-    // Fetch SOL balance.
-    provider.connection
-      .getAccountInfo(provider.wallet.publicKey)
-      .then((acc) => {
-        if (acc) {
-
-          // @ts-ignore
-          setUserTokens([...userTokens, {
-            publicKey: provider.wallet.publicKey,
-            
-            // @ts-ignore
-            account: {
-              amount: new BN(acc.lamports),
-              mint: SOL_MINT,
-            },
-          }])
-        }
-      });
-  }, [provider.wallet.publicKey, provider.connection]);
+  }, pollDuration);
 
   return (
     <_TokenContext.Provider
       value={{
         provider,
-        isLoaded,
         userTokens,
-        setUserTokens,
       }}
     >
       {children}
@@ -101,68 +82,24 @@ export function useTokenContext() {
   return ctx;
 }
 
-export function usePollForBalance() {
-  const { fromMint, toMint } = useSwapContext()
-  const { provider, userTokens, setUserTokens } = useTokenContext();
-  const poll = fromMint && toMint && provider.wallet.publicKey 
-
-  useInterval(async () => {
-    console.log('polled')
-    const clonedTokens = [...userTokens];
-
-    [fromMint, toMint].forEach(async (mint) => {
-      const savedTokenInfo = clonedTokens.find(token => token.account.mint.equals(mint))
-      if (savedTokenInfo) {
-        if (mint.equals(SOL_MINT)) {
-          const lamportsBal = await provider.connection.getBalance(provider.wallet.publicKey)
-          console.log('Lamports balance', lamportsBal)
-  
-          savedTokenInfo.account.amount = new BN(lamportsBal);
-        } else {
-          const token = new Token(
-            provider.connection,
-            mint,
-            TOKEN_PROGRAM_ID,
-            new Keypair()
-          )
-          const updatedTokenInfo = await token.getAccountInfo(savedTokenInfo.publicKey)
-          if (!updatedTokenInfo.amount.eq(savedTokenInfo.account.amount)) {
-            savedTokenInfo.account = updatedTokenInfo;
-          }
-        }
-      }
-    })
-    setUserTokens(clonedTokens)
-  }, poll ? 8000 : null);
-}
-
 /**
  * Hook to return token balance of user for given mint
- * @param mint 
- * @returns 
+ * @param mint
+ * @returns
  */
 // Null => none exists.
 // Undefined => loading.
 export function useOwnedTokenAccount(
   mint?: PublicKey
-): { publicKey: PublicKey; account: TokenAccountInfo } | null | undefined {
-  const { provider, userTokens, setUserTokens } = useTokenContext();
-
-  const tokenAccountIndex = userTokens.findIndex(token => {
-    return mint && token.account.mint.equals(mint)
-  })
-
-  let tokenAccount: CachedToken | undefined
-
-  if (tokenAccountIndex !== -1) {
-    tokenAccount = userTokens[tokenAccountIndex]
-  }
-  const isSol = mint?.equals(SOL_MINT);
-
+): SavedTokenInfo | undefined | null {
+  const { userTokens } = useTokenContext();
   // Loading
   if (mint === undefined) {
     return undefined;
   }
+
+  const isSol = mint?.equals(SOL_MINT);
+  const tokenAccount = userTokens?.[mint.toString()];
 
   // Account for given mint does not exist
   if (!isSol && !tokenAccount) {
@@ -186,8 +123,8 @@ export function setMintCache(pk: PublicKey, account: MintInfo) {
 
 /**
  * Return mint info for given mint address
- * @param mint 
- * @returns 
+ * @param mint
+ * @returns
  */
 export function useMint(mint?: PublicKey): MintInfo | undefined | null {
   const { provider } = useTokenContext();
@@ -204,7 +141,7 @@ export function useMint(mint?: PublicKey): MintInfo | undefined | null {
       provider.connection,
       mint,
       TOKEN_PROGRAM_ID,
-      new Account()
+      new Keypair()
     );
     const mintInfo = mintClient.getMintInfo();
     _MINT_CACHE.set(mint.toString(), mintInfo);
@@ -216,5 +153,3 @@ export function useMint(mint?: PublicKey): MintInfo | undefined | null {
   }
   return undefined;
 }
-
-

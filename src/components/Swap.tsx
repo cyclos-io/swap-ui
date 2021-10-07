@@ -26,8 +26,7 @@ import {
   Transaction,
   TransactionInstruction,
 } from "@solana/web3.js";
-import useInterval from "@use-it/interval";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   FEE_MULTIPLIER,
   useDexContext,
@@ -47,12 +46,8 @@ import {
   useSwapFair,
 } from "../context/Swap";
 import {
-  // addTokensToCache,
-  
-  CachedToken,
   useMint,
   useOwnedTokenAccount,
-  usePollForBalance,
   useTokenContext,
 } from "../context/Token";
 import { useTokenMap } from "../context/TokenList";
@@ -168,8 +163,7 @@ export default function SwapCard({
   connectWalletCallback?: any;
 }) {
   const styles = useStyles();
-  usePollForBalance();
-  
+
   return (
     <Card className={styles.card} style={containerStyle}>
       <SwapHeader />
@@ -273,16 +267,13 @@ export function SwapTokenForm({
   setAmount: (a: number) => void;
 }) {
   const styles = useStyles();
-  const { provider, userTokens, setUserTokens } = useTokenContext();
+  const { provider } = useTokenContext();
   const [showTokenDialog, setShowTokenDialog] = useState(false);
 
   const tokenAccount = useOwnedTokenAccount(mint);
-  const mintAccount = useMint(mint);  
+  const mintAccount = useMint(mint);
 
-  const balance =
-    tokenAccount &&
-    mintAccount &&
-    tokenAccount.account.amount.toNumber() / 10 ** mintAccount.decimals;
+  const balance = tokenAccount && mintAccount && tokenAccount.tokenAmount;
 
   const formattedAmount =
     mintAccount && amount
@@ -439,7 +430,7 @@ export function SwapButton({
     addOpenOrderAccount,
     openOrders,
   } = useDexContext();
-  const { isLoaded: isTokensLoaded } = useTokenContext();
+  const { userTokens } = useTokenContext();
   const tokenMap = useTokenMap();
 
   // Token to be traded away
@@ -487,9 +478,7 @@ export function SwapButton({
   const disconnected = !swapClient.program.provider.wallet.publicKey;
 
   const insufficientBalance =
-    fromAmount == 0 ||
-    fromAmount * Math.pow(10, fromMintInfo?.decimals ?? 0) >
-      (fromWallet?.account.amount.toNumber() ?? 0);
+    fromAmount == 0 || fromAmount > (fromWallet?.tokenAmount ?? 0);
 
   const needsCreateAccounts =
     !toWallet ||
@@ -609,31 +598,7 @@ export function SwapButton({
         await saveOpenOrders(ooTo.publicKey);
       }
 
-      // Save created associated token accounts to cache
-      const tokensToAdd: CachedToken[] = [];
-      if (toAssociatedPubkey) {
-        tokensToAdd.push(
-          getNewTokenAccountData(
-            toAssociatedPubkey,
-            toMint,
-            swapClient.program.provider.wallet.publicKey
-          )
-        );
-      }
-      if (quoteAssociatedPubkey && !quoteMint.equals(toMint)) {
-        tokensToAdd.push(
-          getNewTokenAccountData(
-            quoteAssociatedPubkey,
-            quoteMint,
-            swapClient.program.provider.wallet.publicKey
-          )
-        );
-      }
-      // addTokensToCache(tokensToAdd);
-
-      // Refresh UI to display balance of the created token account
-      // refreshTokenState();
-
+      // No need to save created token accounts, they will be fetched on polling
     } catch (error) {}
   };
 
@@ -681,7 +646,7 @@ export function SwapButton({
         Token.createTransferInstruction(
           TOKEN_PROGRAM_ID,
           wrappedSolPubkey,
-          toWallet.publicKey,
+          new PublicKey(toWallet.tokenAccount),
           swapClient.program.provider.wallet.publicKey,
           [],
           amount
@@ -721,7 +686,7 @@ export function SwapButton({
     tx.add(
       Token.createTransferInstruction(
         TOKEN_PROGRAM_ID,
-        fromWallet!.publicKey,
+        new PublicKey(fromWallet!.tokenAccount),
         wrappedSolAccount.publicKey,
         swapClient.program.provider.wallet.publicKey,
         [],
@@ -748,7 +713,7 @@ export function SwapButton({
       wusdcToUsdc?: boolean;
     }
     const solletReqBody: SolletBody = {
-      address: toWallet!.publicKey.toString(),
+      address: toWallet!.tokenAccount,
       blockchain: "sol",
       coin: toMint.toString(),
       size: 1,
@@ -778,7 +743,7 @@ export function SwapButton({
     tx.add(
       Token.createTransferInstruction(
         TOKEN_PROGRAM_ID,
-        fromWallet!.publicKey,
+        new PublicKey(fromWallet!.tokenAccount),
         new PublicKey(bridgeAddr),
         swapClient.program.provider.wallet.publicKey,
         [],
@@ -788,7 +753,7 @@ export function SwapButton({
     tx.add(
       new TransactionInstruction({
         keys: [],
-        data: Buffer.from(toWallet!.publicKey.toString(), "utf-8"),
+        data: Buffer.from(toWallet!.tokenAccount, "utf-8"),
         programId: MEMO_PROGRAM_ID,
       })
     );
@@ -828,12 +793,12 @@ export function SwapButton({
       const fromWalletAddr = fromMint.equals(SOL_MINT)
         ? wrappedSolAccount!.publicKey
         : fromWallet
-        ? fromWallet.publicKey
+        ? new PublicKey(fromWallet.tokenAccount)
         : undefined;
       const toWalletAddr = toMint.equals(SOL_MINT)
         ? wrappedSolAccount!.publicKey
         : toWallet
-        ? toWallet.publicKey
+        ? new PublicKey(toWallet.tokenAccount)
         : undefined;
 
       const fromOpenOrdersList = openOrders.get(fromMarket?.address.toString());
@@ -856,7 +821,9 @@ export function SwapButton({
         toOpenOrders: toOpenOrders ? toOpenOrders[0].address : undefined,
         fromWallet: fromWalletAddr,
         toWallet: toWalletAddr,
-        quoteWallet: quoteWallet ? quoteWallet.publicKey : undefined,
+        quoteWallet: quoteWallet
+          ? new PublicKey(quoteWallet.tokenAccount)
+          : undefined,
         // Auto close newly created open orders accounts.
         close: isClosingNewAccounts,
       });
@@ -901,7 +868,7 @@ export function SwapButton({
       </Button>
     );
   }
-  if (!isDexLoaded || !isTokensLoaded) {
+  if (!isDexLoaded || !userTokens) {
     return (
       <Button
         variant="contained"
@@ -1068,26 +1035,4 @@ function unwrapSol(
     )
   );
   return { tx, signers: [] };
-}
-function getNewTokenAccountData(
-  toAssociatedPubkey: PublicKey,
-  mint: PublicKey,
-  owner: PublicKey
-): CachedToken {
-  return {
-    publicKey: toAssociatedPubkey,
-    account: {
-      address: toAssociatedPubkey,
-      mint,
-      owner,
-      amount: new u64(0),
-      delegate: null,
-      delegatedAmount: new u64(0),
-      isInitialized: true,
-      isFrozen: false,
-      isNative: false,
-      rentExemptReserve: null,
-      closeAuthority: null,
-    },
-  };
 }
