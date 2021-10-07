@@ -22,7 +22,12 @@ import { OpenOrders } from "@project-serum/serum";
 import { MintInfo } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { useEffect, useMemo, useState } from "react";
-import { useDexContext, useMarket, useOpenOrders } from "../context/Dex";
+import {
+  useDexContext,
+  useMarket,
+  useOpenOrders,
+  useUnsettle,
+} from "../context/Dex";
 import { useMint, useOwnedTokenAccount } from "../context/Token";
 import { useTokenMap } from "../context/TokenList";
 import { DEX_PID } from "../utils/pubkeys";
@@ -77,12 +82,14 @@ export default function OpenOrdersDialog({
 function OpenOrdersAccounts() {
   const styles = useStyles();
   const openOrders = useOpenOrders();
+  const { isUnsettledAmt, settleAll } = useUnsettle();
   const openOrdersEntries: Array<[PublicKey, OpenOrders[]]> = useMemo(() => {
     return Array.from(openOrders.entries()).map(([market, oo]) => [
       new PublicKey(market),
       oo,
     ]);
   }, [openOrders]);
+  const openOrdersEntriesLen = openOrdersEntries.length;
   return (
     <TableContainer component={Paper} elevation={0}>
       <Table className={styles.table} aria-label="simple table">
@@ -99,15 +106,34 @@ function OpenOrdersAccounts() {
           </TableRow>
         </TableHead>
         <TableBody>
-          {openOrdersEntries.map(([market, oos]) => {
-            return (
-              <OpenOrdersRow
-                key={market.toString()}
-                market={market}
-                openOrders={oos}
-              />
-            );
-          })}
+          {openOrdersEntriesLen === 0 ? (
+            <TableRow>
+              <TableCell align="center" colSpan={8}>
+                No Open Orders Accounts
+              </TableCell>
+            </TableRow>
+          ) : (
+            openOrdersEntries.map(([market, oos]) => {
+              return (
+                <OpenOrdersRow
+                  key={market.toString()}
+                  market={market}
+                  openOrders={oos}
+                />
+              );
+            })
+          )}
+          <TableRow>
+            <TableCell colSpan={8} align="right">
+              <Button
+                color="primary"
+                disabled={!isUnsettledAmt}
+                onClick={settleAll}
+              >
+                Settle All
+              </Button>
+            </TableCell>
+          </TableRow>
         </TableBody>
       </Table>
     </TableContainer>
@@ -148,7 +174,7 @@ function OpenOrdersRow({
     0;
   const closeDisabled =
     ooAccount.baseTokenTotal.toNumber() +
-      ooAccount.quoteTokenTotal.toNumber() !==
+    ooAccount.quoteTokenTotal.toNumber() !==
     0;
 
   const settleFunds = async () => {
@@ -188,7 +214,7 @@ function OpenOrdersRow({
       <TableCell component="th" scope="row">
         <Typography>
           <Link
-            href={`https://dex.projectserum.com/#/market/${market.toString()}`}
+            href={`https://dex.cyclos.io/#/market/${market.toString()}`}
             target="_blank"
             rel="noopener"
           >

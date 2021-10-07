@@ -7,8 +7,16 @@ import {
   TextField,
   Typography,
   useTheme,
+  IconButton,
+  Collapse,
 } from "@material-ui/core";
-import { ExpandMore, ImportExportRounded } from "@material-ui/icons";
+import { Alert } from "@material-ui/lab";
+import {
+  ExpandMore,
+  ImportExportRounded,
+  WarningOutlined,
+  Close as CloseIcon,
+} from "@material-ui/icons";
 import { BN, Provider } from "@project-serum/anchor";
 import { OpenOrders } from "@project-serum/serum";
 import {
@@ -33,6 +41,7 @@ import {
   useMarket,
   useRoute,
   useRouteVerbose,
+  useUnsettle,
 } from "../context/Dex";
 import {
   useCanCreateAccounts,
@@ -149,6 +158,12 @@ const useStyles = makeStyles((theme) => ({
     padding: 0,
     fontSize: "14px",
   },
+  settleButton: {
+    backgroundColor: theme.palette.primary.main,
+    color: theme.palette.primary.contrastText,
+    cursor: "pointer",
+    marginLeft: "auto",
+  },
 }));
 
 export default function SwapCard({
@@ -165,20 +180,71 @@ export default function SwapCard({
   connectWalletCallback?: any;
 }) {
   const styles = useStyles();
+  const { isUnsettledAmt } = useUnsettle();
+  let [openWarning, setOpenWarning] = useState(isUnsettledAmt);
+  useMemo(() => {
+    setOpenWarning(isUnsettledAmt);
+  }, [isUnsettledAmt]);
+
   return (
-    <Card className={styles.card} style={containerStyle}>
-      <SwapHeader />
-      <div style={contentStyle}>
-        <SwapFromForm style={swapTokenContainerStyle} />
-        <ArrowButton style={swapTokenContainerStyle} />
-        <SwapToForm style={swapTokenContainerStyle} />
-        <InfoLabel />
-        <SwapButton
-          swapButtonStyle={swapButtonStyle}
-          connectWalletCallback={connectWalletCallback}
-        />
-      </div>
-    </Card>
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      <SwapWarning open={openWarning} setOpen={setOpenWarning} />
+      <Card className={styles.card} style={containerStyle}>
+        <SwapHeader />
+        <div style={contentStyle}>
+          <SwapFromForm style={swapTokenContainerStyle} />
+          <ArrowButton style={swapTokenContainerStyle} />
+          <SwapToForm style={swapTokenContainerStyle} />
+          <InfoLabel />
+          <SwapButton
+            swapButtonStyle={swapButtonStyle}
+            connectWalletCallback={connectWalletCallback}
+          />
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+export function SwapWarning({ open, setOpen }: { open: any; setOpen: any }) {
+  const theme = useTheme();
+  const { settleAll } = useUnsettle();
+  return (
+    <div
+      style={{
+        width: theme.spacing(55),
+        borderRadius: theme.spacing(2),
+        boxShadow: "0px 0px 30px 5px rgba(0,0,0,0.075)",
+        // padding: theme.spacing(2),
+        marginBottom: theme.spacing(2),
+        paddingTop: 0,
+      }}
+    >
+      <Collapse in={open}>
+        <Alert
+          severity="warning"
+          action={
+            <IconButton
+              aria-label="close"
+              color="inherit"
+              size="small"
+              onClick={() => {
+                setOpen(false);
+              }}
+            >
+              <CloseIcon fontSize="inherit" />
+            </IconButton>
+          }
+          style={{ display: "flex", alignItems: "flex-start" }}
+        >
+          You have some unsettled serum accounts. <br />
+          Click below to settle <br />
+          <Button variant="outlined" onClick={settleAll}>
+            Settle All
+          </Button>
+        </Alert>
+      </Collapse>
+    </div>
   );
 }
 
@@ -281,9 +347,9 @@ export function SwapTokenForm({
   const formattedAmount =
     mintAccount && amount
       ? amount.toLocaleString("fullwide", {
-          maximumFractionDigits: mintAccount.decimals,
-          useGrouping: false,
-        })
+        maximumFractionDigits: mintAccount.decimals,
+        useGrouping: false,
+      })
       : amount;
 
   const tokenDialog = useMemo(() => {
@@ -483,7 +549,7 @@ export function SwapButton({
   const insufficientBalance =
     fromAmount == 0 ||
     fromAmount * Math.pow(10, fromMintInfo?.decimals ?? 0) >
-      (fromWallet?.account.amount.toNumber() ?? 0);
+    (fromWallet?.account.amount.toNumber() ?? 0);
 
   const needsCreateAccounts =
     !toWallet ||
@@ -627,7 +693,7 @@ export function SwapButton({
 
       // Refresh UI to display balance of the created token account
       refreshTokenState();
-    } catch (error) {}
+    } catch (error) { }
   };
 
   const sendWrapSolTransaction = async () => {
@@ -654,11 +720,11 @@ export function SwapButton({
     const wrappedSolPubkey = wrappedSolAccount
       ? wrappedSolAccount.publicKey
       : await Token.getAssociatedTokenAddress(
-          ASSOCIATED_TOKEN_PROGRAM_ID,
-          TOKEN_PROGRAM_ID,
-          fromMint,
-          swapClient.program.provider.wallet.publicKey
-        );
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+        TOKEN_PROGRAM_ID,
+        fromMint,
+        swapClient.program.provider.wallet.publicKey
+      );
 
     // Wrap the SOL.
     const { tx, signers } = await wrapSol(
@@ -762,9 +828,9 @@ export function SwapButton({
 
     const { address: bridgeAddr, maxSize } = (await solletRes.json())
       .result as {
-      address: string;
-      maxSize: number;
-    };
+        address: string;
+        maxSize: number;
+      };
 
     const tx = new Transaction();
     const amount = new u64(fromAmount * 10 ** fromMintInfo!.decimals);
@@ -821,13 +887,13 @@ export function SwapButton({
       const fromWalletAddr = fromMint.equals(SOL_MINT)
         ? wrappedSolAccount!.publicKey
         : fromWallet
-        ? fromWallet.publicKey
-        : undefined;
+          ? fromWallet.publicKey
+          : undefined;
       const toWalletAddr = toMint.equals(SOL_MINT)
         ? wrappedSolAccount!.publicKey
         : toWallet
-        ? toWallet.publicKey
-        : undefined;
+          ? toWallet.publicKey
+          : undefined;
 
       const fromOpenOrdersList = openOrders.get(fromMarket?.address.toString());
       let fromOpenOrders: PublicKey | undefined = undefined;
