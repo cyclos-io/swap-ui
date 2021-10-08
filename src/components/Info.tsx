@@ -19,8 +19,7 @@ import {
   useRoute,
 } from "../context/Dex";
 import { getSwapFair, useSwapContext } from "../context/Swap";
-import { useMint } from "../context/Token";
-import { useTokenMap } from "../context/TokenList";
+import { useTokenInfo } from "../context/TokenList";
 import { SettingsButton } from "./Settings";
 
 const useStyles = makeStyles((theme: Theme) => ({
@@ -49,13 +48,9 @@ export function InfoLabel() {
     showReversePrices,
     setShowReversePrices,
   } = useSwapContext();
-  const fromMintInfo = useMint(fromMint);
-  const toMintInfo = useMint(toMint);
   const fair = getSwapFair(showReversePrices);
-
-  const tokenMap = useTokenMap();
-  let fromTokenInfo = tokenMap.get(fromMint.toString());
-  let toTokenInfo = tokenMap.get(toMint.toString());
+  const fromTokenInfo = useTokenInfo(fromMint);
+  const toTokenInfo = useTokenInfo(toMint);
 
   // Use last route item to find impact
   const route = useRoute(fromMint, toMint);
@@ -89,8 +84,8 @@ export function InfoLabel() {
         >
           {fair !== undefined && toTokenInfo && fromTokenInfo
             ? showReversePrices
-              ? `${fair.toFixed(toMintInfo?.decimals)} ${toTokenInfo.symbol}`
-              : `${fair.toFixed(fromMintInfo?.decimals)} ${
+              ? `${fair.toFixed(toTokenInfo.decimals)} ${toTokenInfo.symbol}`
+              : `${fair.toFixed(fromTokenInfo.decimals)} ${
                   fromTokenInfo.symbol
                 }`
             : `-`}
@@ -171,12 +166,12 @@ export function InfoButton({ route }: { route: PublicKey[] | null }) {
 
 function InfoDetails({ route }: { route: PublicKey[] | null }) {
   const { fromMint, toMint } = useSwapContext();
-  const tokenMap = useTokenMap();
-  const fromMintTicker = tokenMap.get(fromMint.toString())?.symbol;
-  const toMintTicker = tokenMap.get(toMint.toString())?.symbol;
+  const fromTokenInfo = useTokenInfo(fromMint);
+  const toTokenInfo = useTokenInfo(toMint);
+
   const addresses = [
-    { ticker: fromMintTicker, mint: fromMint },
-    { ticker: toMintTicker, mint: toMint },
+    { ticker: fromTokenInfo?.symbol, mint: fromMint },
+    { ticker: toTokenInfo?.symbol, mint: toMint },
   ];
 
   return (

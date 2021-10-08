@@ -23,9 +23,8 @@ import {
   WORM_USDT_MARKET,
   WORM_MARKET_BASE,
 } from "../utils/pubkeys";
-import { useTokenMap, useTokenListContext } from "./TokenList";
+import { useTokenListContext, useTokenInfo } from "./TokenList";
 import { fetchSolletInfo, requestWormholeSwapMarketIfNeeded } from "./Sollet";
-import { setMintCache } from "./Token";
 import { useSwapContext, useIsWrapSol } from "./Swap";
 
 const BASE_TAKER_FEE_BPS = 0.0022;
@@ -146,7 +145,7 @@ export function DexContextProvider(props: any) {
       );
       const mintInfos = mints.map((mint) => {
         const mintInfo = MintLayout.decode(mint!.account.data);
-        setMintCache(mint!.publicKey, mintInfo);
+        // setMintCache(mint!.publicKey, mintInfo);
         return { publicKey: mint!.publicKey, mintInfo };
       });
 
@@ -353,19 +352,17 @@ export function useOrderbook(market?: PublicKey): Orderbook | undefined {
 }
 
 export function useMarketName(market: PublicKey): string | null {
-  const tokenMap = useTokenMap();
   const marketClient = useMarket(market);
+  const baseTokenInfo = useTokenInfo(marketClient?.baseMintAddress);
+  const quoteTokenInfo = useTokenInfo(marketClient?.baseMintAddress);
+
   if (!marketClient) {
     return null;
   }
-  const baseTicker = marketClient
-    ? tokenMap.get(marketClient?.baseMintAddress.toString())?.symbol
-    : "-";
-  const quoteTicker = marketClient
-    ? tokenMap.get(marketClient?.quoteMintAddress.toString())?.symbol
-    : "-";
-  const name = `${baseTicker} / ${quoteTicker}`;
-  return name;
+  const baseTicker = baseTokenInfo?.symbol ?? "-";
+  const quoteTicker = quoteTokenInfo?.symbol ?? "-";
+
+  return `${baseTicker} / ${quoteTicker}`;
 }
 
 // TODO handle edge case of insufficient liquidity

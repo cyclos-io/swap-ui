@@ -7,15 +7,22 @@ import React, {
 } from "react";
 import { TokenInfo, TokenListContainer } from "@solana/spl-token-registry";
 import { PublicKey } from "@solana/web3.js";
+import { Provider } from "@project-serum/anchor";
 import { WRAPPED_SOL_MINT } from "@project-serum/serum/lib/token-instructions";
 import { LocalStorage } from "../utils/localStorage";
 import { SOL_MINT } from "../utils/pubkeys";
 import { useTokenContext } from "./Token";
-import { Provider } from "@project-serum/anchor";
 
 interface TokenCommonBaseInfo extends TokenInfo {
   isCommonBase?: boolean;
 }
+
+type Props = {
+  tokenList: TokenListContainer;
+  commonBases: PublicKey[] | undefined;
+  provider: Provider;
+  children: ReactNode;
+};
 
 type TokenListContext = {
   tokenMap: Map<string, TokenInfo>;
@@ -27,7 +34,7 @@ type TokenListContext = {
   tokenBase: TokenInfo[] | undefined;
   addNewBase: (token: TokenInfo) => void;
   removeBase: (token: TokenInfo) => void;
-  tokenBaseMap: Map<string, TokenCommonBaseInfo>;
+  tokenBaseMap: Map<string, TokenCommonBaseInfo>; // TODO remove, use tokenMap
 };
 const _TokenListContext = React.createContext<null | TokenListContext>(null);
 
@@ -55,12 +62,6 @@ const SOL_TOKEN_INFO = {
   },
 };
 
-type Props = {
-  tokenList: TokenListContainer;
-  commonBases: PublicKey[] | undefined;
-  provider: Provider;
-  children: ReactNode;
-};
 export function TokenListContextProvider(props: Props) {
   const { userTokens } = useTokenContext();
 
@@ -178,7 +179,7 @@ export function TokenListContextProvider(props: Props) {
         // save in persistent storage
         setValues(token.address);
       }
-      
+
       return token;
     });
     setTokenBase(cb);
@@ -247,9 +248,13 @@ export function useTokenListContext(): TokenListContext {
   return ctx;
 }
 
-export function useTokenMap(): Map<string, TokenInfo> {
+export function useTokenInfo(tokenMint?: PublicKey) {
   const { tokenMap } = useTokenListContext();
-  return tokenMap;
+
+  if (!tokenMint) {
+    return undefined;
+  }
+  return tokenMap.get(tokenMint.toString());
 }
 
 export function useSwappableTokens() {

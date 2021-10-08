@@ -28,7 +28,7 @@ import {
   useTokenListContext,
   SPL_REGISTRY_SOLLET_TAG,
   SPL_REGISTRY_WORM_TAG,
-  useTokenMap,
+  useTokenInfo,
 } from "./TokenList";
 import { useOwnedTokenAccount } from "../context/Token";
 
@@ -311,7 +311,7 @@ export function useMinSwapAmount(fromMarket?: Market, toMarket?: Market) {
   const { fromMint, fromAmount, toAmount } = useSwapContext();
   const fromMarketBbo = useBbo(fromMarket?.publicKey);
   const toMarketMidBbo = useBbo(toMarket?.publicKey);
-  const tokenMap = useTokenMap();
+  const { tokenMap } = useTokenListContext();
 
   if (!fromMarket) {
     return undefined;
@@ -322,20 +322,24 @@ export function useMinSwapAmount(fromMarket?: Market, toMarket?: Market) {
   const belowFromMarketMinSize = fromMarketBaseAmount < fromMarketMinSize;
 
   if (!toMarket && belowFromMarketMinSize) {
+    // Single market swap
     let tokenSymbol =
-      tokenMap.get(fromMarket!.baseMintAddress.toString())?.symbol ?? "unknown";
+      tokenMap.get(fromMarket!.baseMintAddress.toString())?.symbol ?? "-";
     return getMinSwapMessage(fromMarketMinSize, tokenSymbol);
   } else if (toMarket) {
+    // Multi market swap
     const toMarketMinSize = toMarket.minOrderSize;
     const belowToMarketMinSize = toAmount < toMarketMinSize;
+
     if (belowToMarketMinSize || belowFromMarketMinSize) {
+      // If both are below min size, the token with higher worth is the min amount
       const fromTokenWorth = fromMarketMinSize * (fromMarketBbo?.bestBid ?? 0);
       const toTokenWorth = toMarketMinSize * (toMarketMidBbo?.bestBid ?? 0);
       const higherMinSizeWorthMarket =
         fromTokenWorth > toTokenWorth ? fromMarket : toMarket;
       const tokenSymbol =
         tokenMap.get(higherMinSizeWorthMarket!.baseMintAddress.toString())
-          ?.symbol ?? "unknown";
+          ?.symbol ?? "-";
 
       return getMinSwapMessage(
         higherMinSizeWorthMarket.minOrderSize,

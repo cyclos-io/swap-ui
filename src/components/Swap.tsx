@@ -45,12 +45,8 @@ import {
   useSwapContext,
   useSwapFair,
 } from "../context/Swap";
-import {
-  useMint,
-  useOwnedTokenAccount,
-  useTokenContext,
-} from "../context/Token";
-import { useTokenMap } from "../context/TokenList";
+import { useOwnedTokenAccount, useTokenContext } from "../context/Token";
+import { useTokenInfo } from "../context/TokenList";
 import {
   DEX_PID,
   MEMO_PROGRAM_ID,
@@ -267,18 +263,17 @@ export function SwapTokenForm({
   setAmount: (a: number) => void;
 }) {
   const styles = useStyles();
-  const { provider } = useTokenContext();
   const [showTokenDialog, setShowTokenDialog] = useState(false);
-
   const tokenAccount = useOwnedTokenAccount(mint);
-  const mintAccount = useMint(mint);
+  const tokenInfo = useTokenInfo(mint);
+  const mintDecimals = tokenInfo?.decimals;
 
-  const balance = tokenAccount && mintAccount && tokenAccount.tokenAmount;
+  const balance = tokenAccount && mintDecimals && tokenAccount.tokenAmount;
 
   const formattedAmount =
-    mintAccount && amount
+    mintDecimals && amount
       ? amount.toLocaleString("fullwide", {
-          maximumFractionDigits: mintAccount.decimals,
+          maximumFractionDigits: mintDecimals,
           useGrouping: false,
         })
       : amount;
@@ -313,14 +308,12 @@ export function SwapTokenForm({
         />
       </Box>
       <Box className={styles.balanceContainer}>
-        {tokenAccount && mintAccount ? (
+        {tokenAccount && mintDecimals ? (
           <Box>
             <Typography variant="caption">
               <small>Balance:&nbsp;</small>
             </Typography>
-            {/* <Typography color="textSecondary"> */}
-            {balance?.toFixed(mintAccount.decimals)}
-            {/* </Typography> */}
+            {balance?.toFixed(mintDecimals)}
           </Box>
         ) : (
           `-`
@@ -375,8 +368,8 @@ function TokenButton({
 }
 
 export function TokenIcon({ mint, style }: { mint: PublicKey; style?: any }) {
-  const tokenMap = useTokenMap();
-  let tokenInfo = tokenMap.get(mint.toString());
+  const tokenInfo = useTokenInfo(mint);
+
   return (
     <div
       style={{
@@ -391,9 +384,9 @@ export function TokenIcon({ mint, style }: { mint: PublicKey; style?: any }) {
 }
 
 function TokenName({ mint, style }: { mint: PublicKey; style: any }) {
-  const tokenMap = useTokenMap();
   const theme = useTheme();
-  let tokenInfo = tokenMap.get(mint.toString());
+  const tokenInfo = useTokenInfo(mint);
+
   return (
     <Typography
       style={{
@@ -419,7 +412,6 @@ export function SwapButton({
     fromMint,
     toMint,
     fromAmount,
-    toAmount,
     slippage,
     isClosingNewAccounts,
     isStrict,
@@ -431,12 +423,8 @@ export function SwapButton({
     openOrders,
   } = useDexContext();
   const { userTokens } = useTokenContext();
-  const tokenMap = useTokenMap();
-
-  // Token to be traded away
-  const fromMintInfo = useMint(fromMint);
-  // End destination token
-  const toMintInfo = useMint(toMint);
+  const fromTokenInfo = useTokenInfo(fromMint);
+  const toTokenInfo = useTokenInfo(toMint);
 
   const route = useRouteVerbose(fromMint, toMint);
   const fromMarket = useMarket(
@@ -453,7 +441,8 @@ export function SwapButton({
 
   // Intermediary token for multi-market swaps, eg. USDC in a SRM -> BTC swap
   const quoteMint = fromMarket && fromMarket.quoteMintAddress;
-  const quoteMintInfo = useMint(quoteMint);
+  const quoteTokenInfo = useTokenInfo(quoteMint);
+
   const quoteWallet = useOwnedTokenAccount(quoteMint);
   const canCreateAccounts = useCanCreateAccounts();
   const canWrapOrUnwrap = useCanWrapOrUnwrap();
@@ -484,6 +473,10 @@ export function SwapButton({
     !toWallet ||
     (!isUnwrapSollet && (!fromOpenOrders || (toMarket && !toOpenOrders)));
 
+  const fromTokenDecimals = fromTokenInfo?.decimals;
+  const toTokenDecimals = toTokenInfo?.decimals;
+  const quoteTokenDecimals = quoteTokenInfo?.decimals;
+
   // Click handlers.
 
   /**
@@ -491,10 +484,10 @@ export function SwapButton({
    * for the swap, then send a create transaction
    */
   const sendCreateAccountsTransaction = async () => {
-    if (!fromMintInfo || !toMintInfo) {
+    if (!fromTokenDecimals || !toTokenDecimals) {
       throw new Error("Unable to calculate mint decimals");
     }
-    if (!quoteMint || !quoteMintInfo) {
+    if (!quoteMint || !quoteTokenDecimals) {
       throw new Error("Quote mint not found");
     }
     const tx = new Transaction();
@@ -603,13 +596,13 @@ export function SwapButton({
   };
 
   const sendWrapSolTransaction = async () => {
-    if (!fromMintInfo || !toMintInfo) {
+    if (!fromTokenDecimals || !toTokenDecimals) {
       throw new Error("Unable to calculate mint decimals");
     }
-    if (!quoteMint || !quoteMintInfo) {
+    if (!quoteMint || !quoteTokenDecimals) {
       throw new Error("Quote mint not found");
     }
-    const amount = new u64(fromAmount * 10 ** fromMintInfo.decimals);
+    const amount = new u64(fromAmount * 10 ** fromTokenDecimals);
 
     // If the user already has a wrapped SOL account, then we perform a
     // transfer to the existing wrapped SOl account by
@@ -663,13 +656,13 @@ export function SwapButton({
   };
 
   const sendUnwrapSolTransaction = async () => {
-    if (!fromMintInfo || !toMintInfo) {
+    if (!fromTokenDecimals || !toTokenDecimals) {
       throw new Error("Unable to calculate mint decimals");
     }
-    if (!quoteMint || !quoteMintInfo) {
+    if (!quoteMint || !quoteTokenDecimals) {
       throw new Error("Quote mint not found");
     }
-    const amount = new u64(fromAmount * 10 ** fromMintInfo.decimals);
+    const amount = new u64(fromAmount * 10 ** fromTokenDecimals);
 
     // Unwrap *without* closing the existing wrapped account:
     //
@@ -704,6 +697,10 @@ export function SwapButton({
   };
 
   const sendUnwrapSolletTransaction = async () => {
+    if (!fromTokenDecimals || !toTokenDecimals) {
+      throw new Error("Unable to calculate mint decimals");
+    }
+
     interface SolletBody {
       address: string;
       blockchain: string;
@@ -739,7 +736,7 @@ export function SwapButton({
     };
 
     const tx = new Transaction();
-    const amount = new u64(fromAmount * 10 ** fromMintInfo!.decimals);
+    const amount = new u64(fromAmount * 10 ** fromTokenDecimals);
     tx.add(
       Token.createTransferInstruction(
         TOKEN_PROGRAM_ID,
@@ -762,17 +759,17 @@ export function SwapButton({
   };
 
   const sendSwapTransaction = async () => {
-    if (!fromMintInfo || !toMintInfo) {
+    if (!fromTokenDecimals || !toTokenDecimals) {
       throw new Error("Unable to calculate mint decimals");
     }
     if (!fair) {
       throw new Error("Invalid fair");
     }
-    if (!quoteMint || !quoteMintInfo) {
+    if (!quoteMint || !quoteTokenDecimals) {
       throw new Error("Quote mint not found");
     }
 
-    const amount = new BN(fromAmount * 10 ** fromMintInfo.decimals);
+    const amount = new BN(fromAmount * 10 ** fromTokenDecimals);
     const isSol = fromMint.equals(SOL_MINT) || toMint.equals(SOL_MINT);
     const wrappedSolAccount = isSol ? Keypair.generate() : undefined;
 
@@ -783,11 +780,11 @@ export function SwapButton({
       }
 
       const minExchangeRate = {
-        rate: new BN((10 ** toMintInfo.decimals * FEE_MULTIPLIER) / fair)
+        rate: new BN((10 ** toTokenDecimals * FEE_MULTIPLIER) / fair)
           .muln(100 - slippage)
           .divn(100),
-        fromDecimals: fromMintInfo.decimals,
-        quoteDecimals: quoteMintInfo.decimals,
+        fromDecimals: fromTokenDecimals,
+        quoteDecimals: quoteTokenDecimals,
         strict: isStrict,
       };
       const fromWalletAddr = fromMint.equals(SOL_MINT)

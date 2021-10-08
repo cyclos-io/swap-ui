@@ -19,12 +19,11 @@ import {
 import { Close } from "@material-ui/icons";
 import { BN } from "@project-serum/anchor";
 import { OpenOrders } from "@project-serum/serum";
-import { MintInfo } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { useEffect, useMemo, useState } from "react";
 import { useDexContext, useMarket, useOpenOrders } from "../context/Dex";
-import { useMint, useOwnedTokenAccount } from "../context/Token";
-import { useTokenMap } from "../context/TokenList";
+import { useOwnedTokenAccount } from "../context/Token";
+import { useTokenInfo } from "../context/TokenList";
 import { DEX_PID } from "../utils/pubkeys";
 
 const useStyles = makeStyles((theme) => ({
@@ -128,17 +127,14 @@ function OpenOrdersRow({
   }, [openOrders]);
   const { swapClient, closeOpenOrders } = useDexContext();
   const marketClient = useMarket(market);
-  const tokenMap = useTokenMap();
-  const base = useMint(marketClient?.baseMintAddress);
-  const quote = useMint(marketClient?.quoteMintAddress);
+
+  const baseTokenInfo = useTokenInfo(marketClient?.baseMintAddress);
+  const quoteTokenInfo = useTokenInfo(marketClient?.quoteMintAddress);
+
   const baseWallet = useOwnedTokenAccount(marketClient?.baseMintAddress);
   const quoteWallet = useOwnedTokenAccount(marketClient?.quoteMintAddress);
-  const baseTicker = marketClient
-    ? tokenMap.get(marketClient?.baseMintAddress.toString())?.symbol
-    : "-";
-  const quoteTicker = marketClient
-    ? tokenMap.get(marketClient?.quoteMintAddress.toString())?.symbol
-    : "-";
+  const baseTicker = marketClient ? baseTokenInfo?.symbol : "-";
+  const quoteTicker = marketClient ? quoteTokenInfo?.symbol : "-";
   const marketName =
     baseTicker && quoteTicker
       ? `${baseTicker} / ${quoteTicker}`
@@ -220,19 +216,22 @@ function OpenOrdersRow({
         </Select>
       </TableCell>
       <TableCell align="center">
-        {toDisplay(base, ooAccount.baseTokenTotal.sub(ooAccount.baseTokenFree))}
+        {toDisplay(
+          baseTokenInfo?.decimals,
+          ooAccount.baseTokenTotal.sub(ooAccount.baseTokenFree)
+        )}
       </TableCell>
       <TableCell align="center">
-        {toDisplay(base, ooAccount.baseTokenFree)}
+        {toDisplay(baseTokenInfo?.decimals, ooAccount.baseTokenFree)}
       </TableCell>
       <TableCell align="center">
         {toDisplay(
-          quote,
+          quoteTokenInfo?.decimals,
           ooAccount.quoteTokenTotal.sub(ooAccount.quoteTokenFree)
         )}
       </TableCell>
       <TableCell align="center">
-        {toDisplay(quote, ooAccount.quoteTokenFree)}
+        {toDisplay(quoteTokenInfo?.decimals, ooAccount.quoteTokenFree)}
       </TableCell>
       <TableCell align="center">
         <Button color="primary" disabled={settleDisabled} onClick={settleFunds}>
@@ -252,11 +251,9 @@ function OpenOrdersRow({
   );
 }
 
-function toDisplay(mintInfo: MintInfo | undefined | null, value: BN): string {
-  if (!mintInfo) {
+function toDisplay(mintDecimals: number | undefined, value: BN): string {
+  if (!mintDecimals) {
     return value.toNumber().toString();
   }
-  return (value.toNumber() / 10 ** mintInfo.decimals).toFixed(
-    mintInfo.decimals
-  );
+  return (value.toNumber() / 10 ** mintDecimals).toFixed(mintDecimals);
 }

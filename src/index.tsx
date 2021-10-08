@@ -26,8 +26,8 @@ import {
   useSwapContext,
   useSwapFair,
 } from "./context/Swap";
-import { TokenContextProvider, useMint } from "./context/Token";
-import { TokenListContextProvider, useTokenMap } from "./context/TokenList";
+import { TokenContextProvider } from "./context/Token";
+import { TokenListContextProvider } from "./context/TokenList";
 
 /**
  * A`Swap` component that can be embedded into applications. To use,
@@ -207,10 +207,8 @@ export {
   useSwapFair,
   // TokenList.
   TokenListContextProvider,
-  useTokenMap,
   // Token.
   TokenContextProvider,
-  useMint,
   // Dex.
   DexContextProvider,
   useFairRoute,
