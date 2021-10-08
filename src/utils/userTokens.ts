@@ -4,46 +4,6 @@ export type OwnedTokenDetailed = {
   usd: number;
 };
 
-export const fetchSolPrice = async (): Promise<number> => {
-  try {
-    const response = await fetch("https://api.solscan.io/market?symbol=SOL");
-    const json = await response.json();
-    return json.data.priceUsdt;
-  } catch (error) {
-    console.error(error);
-    return 0;
-  }
-};
-
-export const getUserTokens = async (
-  pk?: string
-): Promise<OwnedTokenDetailed[]> => {
-  let data: OwnedTokenDetailed[] = [];
-
-  try {
-    if (pk) {
-      let tokens = await (
-        await fetch(
-          `https://api.solscan.io/account/tokens?address=${pk}&price=1`
-        )
-      ).json();
-      data = tokens.data.map((token: any) => {
-        return {
-          address: token.tokenAddress,
-          balance: token.tokenAmount.uiAmountString,
-          usd: +(token.tokenAmount.uiAmount * (token.priceUsdt ?? 0)).toFixed(
-            4
-          ),
-        };
-      });
-    }
-  } catch (error) {
-    console.error(error);
-  }
-
-  return data.filter((t: OwnedTokenDetailed) => +t.balance > 0);
-};
-
 type SolscanToken = {
   tokenAddress: string;
   tokenAccount: string;
@@ -65,6 +25,12 @@ export type FetchedTokens = {
   [tokenAddress: string]: SavedTokenInfo | undefined;
 };
 
+export const fetchSolPrice = async (): Promise<number> => {
+  const response = await fetch("https://api.solscan.io/market?symbol=SOL");
+  const json = await response.json();
+  return json.data.priceUsdt;
+};
+
 export async function fetchUserTokens(address: string) {
   const tokens = await (
     await fetch(
@@ -72,7 +38,6 @@ export async function fetchUserTokens(address: string) {
     )
   ).json();
   const tokenData = tokens.data as SolscanToken[];
-
   const userTokens: FetchedTokens = {};
 
   tokenData.forEach((token) => {

@@ -1,17 +1,20 @@
-import React, { useContext, useMemo, useState, useEffect } from "react";
-import { TokenInfo } from "@solana/spl-token-registry";
+import React, {
+  useContext,
+  useMemo,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
+import { TokenInfo, TokenListContainer } from "@solana/spl-token-registry";
 import { PublicKey } from "@solana/web3.js";
 import { WRAPPED_SOL_MINT } from "@project-serum/serum/lib/token-instructions";
 import { LocalStorage } from "../utils/localStorage";
 import { SOL_MINT } from "../utils/pubkeys";
-import {
-  fetchSolPrice,
-  getUserTokens,
-  OwnedTokenDetailed,
-} from "../utils/userTokens";
+import { useTokenContext } from "./Token";
+import { Provider } from "@project-serum/anchor";
 
 interface TokenCommonBaseInfo extends TokenInfo {
-  isCommonBase: boolean;
+  isCommonBase?: boolean;
 }
 
 type TokenListContext = {
@@ -25,7 +28,6 @@ type TokenListContext = {
   addNewBase: (token: TokenInfo) => void;
   removeBase: (token: TokenInfo) => void;
   tokenBaseMap: Map<string, TokenCommonBaseInfo>;
-  ownedTokensDetailed: OwnedTokenDetailed[];
 };
 const _TokenListContext = React.createContext<null | TokenListContext>(null);
 
@@ -39,7 +41,7 @@ const SOL_TOKEN_INFO = {
   chainId: 101,
   address: SOL_MINT.toString(),
   name: "Native SOL",
-  decimals: "9",
+  decimals: 9,
   symbol: "SOL",
   logoURI:
     "https://cdn.jsdelivr.net/gh/trustwallet/assets@master/blockchains/solana/info/logo.png",
@@ -53,10 +55,14 @@ const SOL_TOKEN_INFO = {
   },
 };
 
-export function TokenListContextProvider(props: any) {
-  const [ownedTokensDetailed, setOwnedTokensDetailed] = useState<
-    OwnedTokenDetailed[]
-  >([]);
+type Props = {
+  tokenList: TokenListContainer;
+  commonBases: PublicKey[] | undefined;
+  provider: Provider;
+  children: ReactNode;
+};
+export function TokenListContextProvider(props: Props) {
+  const { userTokens } = useTokenContext();
 
   const tokenList = useMemo(() => {
     const list = props.tokenList
@@ -75,40 +81,14 @@ export function TokenListContextProvider(props: any) {
     return list;
   }, [props.tokenList]);
 
-  const pk: PublicKey | undefined = props?.provider?.wallet?.publicKey;
-
   // Token map for quick lookup.
   const tokenMap = useMemo(() => {
-    const tokenMap = new Map();
+    const tokenMap = new Map<string, TokenCommonBaseInfo>();
     tokenList.forEach((t: TokenInfo) => {
       tokenMap.set(t.address, t);
     });
     return tokenMap;
   }, [tokenList]);
-
-  useEffect(() => {
-    (async () => {
-      let solBalance: number = 0;
-      if (pk) solBalance = await props.provider.connection.getBalance(pk);
-      const tokens = await getUserTokens(pk?.toString());
-      const solPrice = await fetchSolPrice();
-
-      solBalance = solBalance / 10 ** +SOL_TOKEN_INFO.decimals;
-
-      const SolDetails = {
-        address: SOL_TOKEN_INFO.address,
-        balance: solBalance.toFixed(6),
-        usd: +(solBalance * solPrice).toFixed(4),
-      };
-      // only show the sol token if wallet is connected
-      if (pk) {
-        setOwnedTokensDetailed([SolDetails, ...tokens]);
-      } else {
-        // on disconnect, tokens = []
-        setOwnedTokensDetailed(tokens);
-      }
-    })();
-  }, [pk]);
 
   // Tokens with USD(x) quoted markets.
   const swappableTokens = useMemo(() => {
@@ -118,30 +98,30 @@ export function TokenListContextProvider(props: any) {
       return isUsdxQuoted;
     });
 
-    const ownedTokensList = ownedTokensDetailed.map((t) => t.address);
+    // Owned tokens sorted by moneyary worth
+    const ownedTokens = allTokens
+      .filter((token) => {
+        return userTokens?.[token.address] !== undefined;
+      })
+      .sort((a: TokenInfo, b: TokenInfo) => {
+        const tokenA = userTokens?.[a.address];
+        const aWorth = (tokenA?.tokenAmount ?? 0) * (tokenA?.priceUsdt ?? 0);
+        const tokenB = userTokens?.[b.address];
+        const bWorth = (tokenB?.tokenAmount ?? 0) * (tokenB?.priceUsdt ?? 0);
 
-    // Partition allTokens (pass & fail reduce)
-    const [ownedTokens, notOwnedtokens] = allTokens.reduce(
-      ([p, f]: [TokenInfo[], TokenInfo[]], t: TokenInfo) =>
-        // pass & fail condition
-        ownedTokensList.includes(t.address) ? [[...p, t], f] : [p, [...f, t]],
-      [[], []]
-    );
-    notOwnedtokens.sort((a: TokenInfo, b: TokenInfo) =>
-      a.symbol < b.symbol ? -1 : a.symbol > b.symbol ? 1 : 0
-    );
-    // sort by price in USD
-    ownedTokens.sort(
-      (a: TokenInfo, b: TokenInfo) =>
-        +ownedTokensDetailed.filter((t: any) => t.address === b.address)?.[0]
-          .usd -
-        +ownedTokensDetailed.filter((t: any) => t.address === a.address)?.[0]
-          .usd
-    );
-    const tokens = ownedTokens.concat(notOwnedtokens);
+        return bWorth - aWorth;
+      });
+    // Not owned tokens in alphabetical order
+    const notOwnedtokens = allTokens
+      .filter((token) => {
+        return userTokens?.[token.address] === undefined;
+      })
+      .sort((a: TokenInfo, b: TokenInfo) =>
+        a.symbol < b.symbol ? -1 : a.symbol > b.symbol ? 1 : 0
+      );
 
-    return tokens;
-  }, [tokenList, tokenMap, ownedTokensDetailed]);
+    return ownedTokens.concat(notOwnedtokens);
+  }, [tokenList, tokenMap, userTokens]);
 
   // Sollet wrapped tokens.
   const [swappableTokensSollet, solletMap] = useMemo(() => {
@@ -190,8 +170,15 @@ export function TokenListContextProvider(props: any) {
     addrList = addrList.map((e: string) => new PublicKey(e.toString()));
     const cb = addrList?.map((add: PublicKey) => {
       const token = tokenMap.get(add.toString());
-      token.isCommonBase = true;
-      setValues(token.address);
+
+      if (token) {
+        // save in react state
+        token.isCommonBase = true;
+
+        // save in persistent storage
+        setValues(token.address);
+      }
+      
       return token;
     });
     setTokenBase(cb);
@@ -245,7 +232,6 @@ export function TokenListContextProvider(props: any) {
         addNewBase,
         removeBase,
         tokenBaseMap,
-        ownedTokensDetailed,
       }}
     >
       {props.children}

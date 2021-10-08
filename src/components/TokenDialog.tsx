@@ -25,6 +25,7 @@ import { CloseRounded, Star, StarOutline } from "@material-ui/icons";
 import { TokenInfo } from "@solana/spl-token-registry";
 import { PublicKey } from "@solana/web3.js";
 import { forwardRef, useState } from "react";
+import { useOwnedTokenAccount, useTokenContext } from "../context/Token";
 import {
   useSwappableTokens,
   useTokenBase,
@@ -236,12 +237,15 @@ function TokenListItem({
 }) {
   const styles = useStyles();
   const theme = useTheme();
+  const { userTokens } = useTokenContext();
   const mint = new PublicKey(tokenInfo.address);
 
-  const { ownedTokensDetailed } = useTokenListContext();
-  const details = ownedTokensDetailed.filter(
-    (t) => t.address === tokenInfo.address
-  )?.[0];
+  // const { ownedTokensDetailed } = useTokenListContext();
+  // const details = ownedTokensDetailed.filter(
+  //   (t) => t.address === tokenInfo.address
+  // )?.[0];
+  // const details = userTokens?.[tokenInfo.address]
+  const details = useOwnedTokenAccount(mint);
 
   return (
     <ListItem button>
@@ -253,7 +257,28 @@ function TokenListItem({
         <TokenName tokenInfo={tokenInfo} />
       </div>
       {/* Token quantity and price */}
-      {+details?.balance > 0 ? (
+      {details?.tokenAmount && details.tokenAmount > 0 && (
+        <Box mr={1} textAlign="end">
+          <ListItemText
+            primary={details?.tokenAmount}
+            secondary={`$${details?.tokenAmount * (details?.priceUsdt ?? 0)}`}
+          />
+        </Box>
+      )}
+      {/* Add to favourites button */}
+      <IconButton
+        size="small"
+        onClick={() =>
+          isCommonBase ? removeBase(tokenInfo) : addNewBase(tokenInfo)
+        }
+      >
+        {isCommonBase ? (
+          <Star fontSize="small" />
+        ) : (
+          <StarOutline fontSize="small" />
+        )}
+      </IconButton>
+      {/* {+details?.tokenAmount ? (
         <Box mr={1} textAlign="end">
           <ListItemText
             primary={details?.balance}
@@ -274,7 +299,7 @@ function TokenListItem({
             <StarOutline fontSize="small" />
           )}
         </IconButton>
-      )}
+      )} */}
     </ListItem>
   );
 }

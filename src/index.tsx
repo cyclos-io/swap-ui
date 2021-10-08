@@ -84,12 +84,12 @@ export default function Swap(props: SwapProps): ReactElement {
   );
   return (
     <ThemeProvider theme={theme}>
-      <TokenListContextProvider
-        tokenList={tokenList}
-        commonBases={commonBases}
-        provider={provider}
-      >
-        <TokenContextProvider provider={provider}>
+      <TokenContextProvider provider={provider}>
+        <TokenListContextProvider
+          tokenList={tokenList}
+          commonBases={commonBases}
+          provider={provider}
+        >
           <DexContextProvider swapClient={swapClient}>
             <SwapContextProvider
               fromMint={fromMint}
@@ -107,8 +107,8 @@ export default function Swap(props: SwapProps): ReactElement {
               />
             </SwapContextProvider>
           </DexContextProvider>
-        </TokenContextProvider>
-      </TokenListContextProvider>
+        </TokenListContextProvider>
+      </TokenContextProvider>
     </ThemeProvider>
   );
 }
