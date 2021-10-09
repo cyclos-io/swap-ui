@@ -30,9 +30,11 @@ import { useSwapContext, useIsWrapSol } from "./Swap";
 const BASE_TAKER_FEE_BPS = 0.0022;
 export const FEE_MULTIPLIER = 1 - BASE_TAKER_FEE_BPS;
 
+// Get OpenOrders public key for swap instructions
+// Callback functions to add and close open order accounts
 type DexContext = {
   // Maps market address to open orders accounts.
-  openOrders: Map<string, Array<OpenOrders>>;
+  openOrders: Map<string, Array<OpenOrders>>; // only public key is read
   closeOpenOrders: (openOrder: OpenOrders) => void;
   addOpenOrderAccount: (market: PublicKey, accountData: OpenOrders) => void;
   swapClient: SwapClient;
@@ -73,9 +75,10 @@ export function DexContextProvider(props: any) {
 
   // Three operations:
   //
-  // 1. Fetch all open orders accounts for the connected wallet.
-  // 2. Batch fetch all market accounts for those open orders.
-  // 3. Batch fetch all mints associated with the markets.
+  // 1. Fetch and store all open orders accounts for the connected wallet.
+  // 2. Batch fetch and store all market accounts for those open orders.
+  // 3. Batch fetch all mints associated with the markets. Read decimal places for storing in
+  // market account state.
   useEffect(() => {
     if (!swapClient.program.provider.wallet.publicKey) {
       setOoAccounts(new Map());
@@ -86,31 +89,41 @@ export function DexContextProvider(props: any) {
       swapClient.program.provider.wallet.publicKey,
       DEX_PID
     ).then(async (openOrders) => {
-      const newOoAccounts = new Map();
-      let markets = new Set<string>();
+      // Find all open order accounts for wallet
+      const newOoAccounts = new Map<string, Array<OpenOrders>>();
+
+      // Markets for which user has OpenOrder accounts
+      const userMarkets = new Set<string>();
+
       openOrders.forEach((oo) => {
-        markets.add(oo.market.toString());
-        if (newOoAccounts.get(oo.market.toString())) {
-          newOoAccounts.get(oo.market.toString()).push(oo);
+        const ooMarket = oo.market.toString()
+        userMarkets.add(ooMarket);
+        const savedOoForMarket = newOoAccounts.get(ooMarket)
+        if (savedOoForMarket) {
+          savedOoForMarket.push(oo);
         } else {
-          newOoAccounts.set(oo.market.toString(), [oo]);
+          newOoAccounts.set(ooMarket, [oo]);
         }
       });
-      if (markets.size > 100) {
+      if (userMarkets.size > 100) {
         // Punt request chunking until there's user demand.
         throw new Error(
           "Too many markets. Please file an issue to update this"
         );
       }
+      // Fetch account info for each user market
       const multipleMarkets = await anchor.utils.rpc.getMultipleAccounts(
         swapClient.program.provider.connection,
-        Array.from(markets.values()).map((m) => new PublicKey(m))
+        Array.from(userMarkets.values()).map((m) => new PublicKey(m))
       );
+
+      // Decode market account info
       const marketClients = multipleMarkets.map((programAccount) => {
         return {
           publicKey: programAccount?.publicKey,
           account: new Market(
             Market.getLayout(DEX_PID).decode(programAccount?.account.data),
+            // base and quote mint decimals fetched later
             -1, // Set below so that we can batch fetch mints.
             -1, // Set below so that we can batch fetch mints.
             swapClient.program.provider.opts,
@@ -139,6 +152,7 @@ export function DexContextProvider(props: any) {
         throw new Error("Too many mints. Please file an issue to update this");
       }
 
+      // Reads mint account infos and decode them
       const mints = await anchor.utils.rpc.getMultipleAccounts(
         swapClient.program.provider.connection,
         mintPubkeys
@@ -149,21 +163,22 @@ export function DexContextProvider(props: any) {
         return { publicKey: mint!.publicKey, mintInfo };
       });
 
-      marketClients.forEach((m) => {
+      // Set decimal places for each market's token accounts, then save in cache
+      marketClients.forEach((marketClient) => {
         const baseMintInfo = mintInfos.filter((mint) =>
-          mint.publicKey.equals(m.account.baseMintAddress)
+          mint.publicKey.equals(marketClient.account.baseMintAddress)
         )[0];
         const quoteMintInfo = mintInfos.filter((mint) =>
-          mint.publicKey.equals(m.account.quoteMintAddress)
+          mint.publicKey.equals(marketClient.account.quoteMintAddress)
         )[0];
         assert.ok(baseMintInfo && quoteMintInfo);
         // @ts-ignore
-        m.account._baseSplTokenDecimals = baseMintInfo.mintInfo.decimals;
+        marketClient.account._baseSplTokenDecimals = baseMintInfo.mintInfo.decimals;
         // @ts-ignore
-        m.account._quoteSplTokenDecimals = quoteMintInfo.mintInfo.decimals;
+        marketClient.account._quoteSplTokenDecimals = quoteMintInfo.mintInfo.decimals;
         _MARKET_CACHE.set(
-          m.publicKey!.toString(),
-          new Promise<Market>((resolve) => resolve(m.account))
+          marketClient.publicKey!.toString(),
+          new Promise<Market>((resolve) => resolve(marketClient.account))
         );
       });
 
@@ -197,12 +212,11 @@ export function useDexContext(): DexContext {
   return ctx;
 }
 
-export function useOpenOrders(): Map<string, Array<OpenOrders>> {
-  const ctx = useDexContext();
-  return ctx.openOrders;
-}
-
-// Lazy load a given market.
+// Lazy load a given market. Used to
+// - Read base and quote token mint addresses
+// - Market address
+// - Call makeSettleFundsTransaction(), loadBids(), loadAsks()
+// New update- return from cache if present, otherwise fetch
 export function useMarket(market?: PublicKey): Market | undefined {
   const { swapClient } = useDexContext();
 
@@ -210,8 +224,10 @@ export function useMarket(market?: PublicKey): Market | undefined {
     if (!market) {
       return undefined;
     }
-    if (_MARKET_CACHE.get(market.toString())) {
-      return _MARKET_CACHE.get(market.toString());
+    // Markets are eager loaded. Check if already stored
+    const savedMarket = _MARKET_CACHE.get(market.toString())
+    if (savedMarket) {
+      return savedMarket;
     }
 
     const marketClient = new Promise<Market>(async (resolve) => {
@@ -237,8 +253,9 @@ export function useMarket(market?: PublicKey): Market | undefined {
   return undefined;
 }
 
-// Lazy load the orderbook for a given market.
-export function useOrderbook(market?: PublicKey): Orderbook | undefined {
+// Lazy load the bids and slabs for a given market.
+// Used to find price impact and bbo
+export function useMarketSlabs(market?: PublicKey): Slabs | undefined {
   const { swapClient } = useDexContext();
   const marketClient = useMarket(market);
   const [refresh, setRefresh] = useState(0);
@@ -247,11 +264,11 @@ export function useOrderbook(market?: PublicKey): Orderbook | undefined {
     if (!market || !marketClient) {
       return undefined;
     }
-    if (_ORDERBOOK_CACHE.get(market.toString())) {
-      return _ORDERBOOK_CACHE.get(market.toString());
+    if (_SLAB_CACHE.get(market.toString())) {
+      return _SLAB_CACHE.get(market.toString());
     }
 
-    const orderbook = new Promise<Orderbook>(async (resolve) => {
+    const orderbook = new Promise<Slabs>(async (resolve) => {
       const [bids, asks] = await Promise.all([
         marketClient.loadBids(swapClient.program.provider.connection),
         marketClient.loadAsks(swapClient.program.provider.connection),
@@ -263,7 +280,7 @@ export function useOrderbook(market?: PublicKey): Orderbook | undefined {
       });
     });
 
-    _ORDERBOOK_CACHE.set(market.toString(), orderbook);
+    _SLAB_CACHE.set(market.toString(), orderbook);
 
     return orderbook;
   }, [refresh, swapClient.program.provider.connection, market, marketClient]);
@@ -276,7 +293,7 @@ export function useOrderbook(market?: PublicKey): Orderbook | undefined {
         marketClient?.bidsAddress,
         async (info) => {
           const bids = OrderbookSide.decode(marketClient, info.data);
-          const orderbook = await _ORDERBOOK_CACHE.get(
+          const orderbook = await _SLAB_CACHE.get(
             marketClient.address.toString()
           );
           const oldBestBid = orderbook?.bids.items(true).next().value;
@@ -314,7 +331,7 @@ export function useOrderbook(market?: PublicKey): Orderbook | undefined {
         marketClient?.asksAddress,
         async (info) => {
           const asks = OrderbookSide.decode(marketClient, info.data);
-          const orderbook = await _ORDERBOOK_CACHE.get(
+          const orderbook = await _SLAB_CACHE.get(
             marketClient.address.toString()
           );
           const oldBestOffer = orderbook?.asks.items(false).next().value;
@@ -368,7 +385,7 @@ export function useMarketName(market: PublicKey): string | null {
 // TODO handle edge case of insufficient liquidity
 export function usePriceImpact(market?: PublicKey): number | undefined {
   const { toAmount, toMint } = useSwapContext();
-  const orderbook = useOrderbook(market);
+  const orderbook = useMarketSlabs(market);
   if (orderbook === undefined) {
     return undefined;
   }
@@ -396,7 +413,7 @@ export function usePriceImpact(market?: PublicKey): number | undefined {
 }
 // Fair price for a given market, as defined by the mid.
 export function useBbo(market?: PublicKey): Bbo | undefined {
-  const orderbook = useOrderbook(market);
+  const orderbook = useMarketSlabs(market);
   if (orderbook === undefined) {
     return undefined;
   }
@@ -514,7 +531,7 @@ export function useRouteVerbose(
   return null;
 }
 
-type Orderbook = {
+type Slabs = {
   bids: OrderbookSide;
   asks: OrderbookSide;
 };
@@ -654,5 +671,7 @@ type Bbo = {
   mid?: number;
 };
 
-const _ORDERBOOK_CACHE = new Map<string, Promise<Orderbook>>();
+// To find price impact and BBO
+const _SLAB_CACHE = new Map<string, Promise<Slabs>>();
+
 const _MARKET_CACHE = new Map<string, Promise<Market>>();

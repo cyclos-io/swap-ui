@@ -21,7 +21,7 @@ import { BN } from "@project-serum/anchor";
 import { OpenOrders } from "@project-serum/serum";
 import { PublicKey } from "@solana/web3.js";
 import { useEffect, useMemo, useState } from "react";
-import { useDexContext, useMarket, useOpenOrders } from "../context/Dex";
+import { useDexContext, useMarket } from "../context/Dex";
 import { useOwnedTokenAccount } from "../context/Token";
 import { useTokenInfo } from "../context/TokenList";
 import { DEX_PID } from "../utils/pubkeys";
@@ -75,7 +75,7 @@ export default function OpenOrdersDialog({
 
 function OpenOrdersAccounts() {
   const styles = useStyles();
-  const openOrders = useOpenOrders();
+  const { openOrders } = useDexContext();
   const openOrdersEntries: Array<[PublicKey, OpenOrders[]]> = useMemo(() => {
     return Array.from(openOrders.entries()).map(([market, oo]) => [
       new PublicKey(market),
