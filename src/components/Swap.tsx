@@ -31,6 +31,7 @@ import {
   FEE_MULTIPLIER,
   useDexContext,
   useMarket,
+  useOpenOrderAccounts,
   useRoute,
   useRouteVerbose,
 } from "../context/Dex";
@@ -418,9 +419,9 @@ export function SwapButton({
   } = useSwapContext();
   const {
     swapClient,
-    isLoaded: isDexLoaded,
+    // isLoaded: isDexLoaded,
     addOpenOrderAccount,
-    openOrders,
+    // openOrders,
   } = useDexContext();
   const { userTokens } = useTokenContext();
   const fromTokenInfo = useTokenInfo(fromMint);
@@ -454,15 +455,18 @@ export function SwapButton({
   const { isWrapSol, isUnwrapSol } = useIsWrapSol(fromMint, toMint);
   const isUnwrapSollet = useIsUnwrapSollet(fromMint, toMint);
 
-  const fromOpenOrders = useMemo(() => {
-    return fromMarket
-      ? openOrders.get(fromMarket?.address.toString())
-      : undefined;
-  }, [fromMarket, openOrders]);
+  const fromOpenOrdersReq = useOpenOrderAccounts(fromMarket)
+  const toOpenOrdersReq = useOpenOrderAccounts(fromMarket)
 
-  const toOpenOrders = useMemo(() => {
-    return toMarket ? openOrders.get(toMarket?.address.toString()) : undefined;
-  }, [toMarket, openOrders]);
+  // const fromOpenOrders = useMemo(() => {
+  //   return fromMarket
+  //     ? openOrders.get(fromMarket?.address.toString())
+  //     : undefined;
+  // }, [fromMarket, openOrders]);
+
+  // const toOpenOrders = useMemo(() => {
+  //   return toMarket ? openOrders.get(toMarket?.address.toString()) : undefined;
+  // }, [toMarket, openOrders]);
 
   const disconnected = !swapClient.program.provider.wallet.publicKey;
 
@@ -471,7 +475,7 @@ export function SwapButton({
 
   const needsCreateAccounts =
     !toWallet ||
-    (!isUnwrapSollet && (!fromOpenOrders || (toMarket && !toOpenOrders)));
+    (!isUnwrapSollet && (!fromOpenOrdersReq || (toMarket && !toOpenOrdersReq)));
 
   const fromTokenDecimals = fromTokenInfo?.decimals;
   const toTokenDecimals = toTokenInfo?.decimals;
@@ -568,12 +572,12 @@ export function SwapButton({
     // Open order accounts for to / from wallets. Generate if not already present
     let ooFrom!: Keypair;
     let ooTo!: Keypair;
-    if (fromMarket && !fromOpenOrders) {
+    if (fromMarket && !fromOpenOrdersReq) {
       ooFrom = Keypair.generate();
       await getInitOpenOrdersIx(ooFrom, fromMarket.address, tx);
       signers.push(ooFrom);
     }
-    if (toMarket && !toOpenOrders) {
+    if (toMarket && !toOpenOrdersReq) {
       ooTo = Keypair.generate();
       await getInitOpenOrdersIx(ooTo, toMarket.address, tx);
       signers.push(ooTo);
@@ -798,11 +802,11 @@ export function SwapButton({
         ? new PublicKey(toWallet.tokenAccount)
         : undefined;
 
-      const fromOpenOrdersList = openOrders.get(fromMarket?.address.toString());
-      let fromOpenOrders: PublicKey | undefined = undefined;
-      if (fromOpenOrdersList) {
-        fromOpenOrders = fromOpenOrdersList[0].address;
-      }
+      // const fromOpenOrdersList = openOrders.get(fromMarket?.address.toString());
+      // let fromOpenOrders: PublicKey | undefined = undefined;
+      // if (fromOpenOrdersList) {
+      //   fromOpenOrders = fromOpenOrdersList[0].address;
+      // }
 
       return await swapClient.swapTxs({
         fromMint,
@@ -813,9 +817,8 @@ export function SwapButton({
         referral,
         fromMarket,
         toMarket,
-        // Automatically created if undefined.
-        fromOpenOrders,
-        toOpenOrders: toOpenOrders ? toOpenOrders[0].address : undefined,
+        fromOpenOrders: fromOpenOrdersReq?.result?.[0]?.address,
+        toOpenOrders: toOpenOrdersReq?.result?.[0]?.address,
         fromWallet: fromWalletAddr,
         toWallet: toWalletAddr,
         quoteWallet: quoteWallet
@@ -865,7 +868,7 @@ export function SwapButton({
       </Button>
     );
   }
-  if (!isDexLoaded || !userTokens) {
+  if (!userTokens || fromOpenOrdersReq.loading || toOpenOrdersReq.loading) {
     return (
       <Button
         variant="contained"

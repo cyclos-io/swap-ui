@@ -75,42 +75,45 @@ export default function OpenOrdersDialog({
 
 function OpenOrdersAccounts() {
   const styles = useStyles();
-  const { openOrders } = useDexContext();
-  const openOrdersEntries: Array<[PublicKey, OpenOrders[]]> = useMemo(() => {
-    return Array.from(openOrders.entries()).map(([market, oo]) => [
-      new PublicKey(market),
-      oo,
-    ]);
-  }, [openOrders]);
-  return (
-    <TableContainer component={Paper} elevation={0}>
-      <Table className={styles.table} aria-label="simple table">
-        <TableHead>
-          <TableRow>
-            <TableCell>Market</TableCell>
-            <TableCell align="center">Open Orders Account</TableCell>
-            <TableCell align="center">Base Used</TableCell>
-            <TableCell align="center">Base Free</TableCell>
-            <TableCell align="center">Quote Used</TableCell>
-            <TableCell align="center">Quote Free</TableCell>
-            <TableCell align="center">Settle</TableCell>
-            <TableCell align="center">Close</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {openOrdersEntries.map(([market, oos]) => {
-            return (
-              <OpenOrdersRow
-                key={market.toString()}
-                market={market}
-                openOrders={oos}
-              />
-            );
-          })}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  );
+
+  return (<></>)
+
+  // const { openOrders } = useDexContext();
+  // const openOrdersEntries: Array<[PublicKey, OpenOrders[]]> = useMemo(() => {
+  //   return Array.from(openOrders.entries()).map(([market, oo]) => [
+  //     new PublicKey(market),
+  //     oo,
+  //   ]);
+  // }, [openOrders]);
+  // return (
+  //   <TableContainer component={Paper} elevation={0}>
+  //     <Table className={styles.table} aria-label="simple table">
+  //       <TableHead>
+  //         <TableRow>
+  //           <TableCell>Market</TableCell>
+  //           <TableCell align="center">Open Orders Account</TableCell>
+  //           <TableCell align="center">Base Used</TableCell>
+  //           <TableCell align="center">Base Free</TableCell>
+  //           <TableCell align="center">Quote Used</TableCell>
+  //           <TableCell align="center">Quote Free</TableCell>
+  //           <TableCell align="center">Settle</TableCell>
+  //           <TableCell align="center">Close</TableCell>
+  //         </TableRow>
+  //       </TableHead>
+  //       <TableBody>
+  //         {openOrdersEntries.map(([market, oos]) => {
+  //           return (
+  //             <OpenOrdersRow
+  //               key={market.toString()}
+  //               market={market}
+  //               openOrders={oos}
+  //             />
+  //           );
+  //         })}
+  //       </TableBody>
+  //     </Table>
+  //   </TableContainer>
+  // );
 }
 
 function OpenOrdersRow({
