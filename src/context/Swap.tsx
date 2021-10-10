@@ -183,13 +183,7 @@ export function useSwapContext(): SwapContext {
   return ctx;
 }
 
-export function useSwapFair(): number | undefined {
-  const { fairOverride, fromMint, toMint } = useSwapContext();
-  return _useSwapFair(fromMint, toMint, fairOverride);
-}
-
-// get reverse price for pair  (diff fn to prevent side-effects)
-export function getSwapFair(reversed: boolean = false): number | undefined {
+export function useSwapFair(reversed?: boolean): number | undefined {
   const { fairOverride, fromMint, toMint } = useSwapContext();
   return reversed
     ? _useSwapFair(toMint, fromMint, fairOverride)

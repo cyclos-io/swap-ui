@@ -455,8 +455,8 @@ export function SwapButton({
   const { isWrapSol, isUnwrapSol } = useIsWrapSol(fromMint, toMint);
   const isUnwrapSollet = useIsUnwrapSollet(fromMint, toMint);
 
-  const fromOpenOrdersReq = useOpenOrderAccounts(fromMarket)
-  const toOpenOrdersReq = useOpenOrderAccounts(fromMarket)
+  const fromOpenOrdersReq = useOpenOrderAccounts(fromMarket);
+  const toOpenOrdersReq = useOpenOrderAccounts(fromMarket);
 
   // const fromOpenOrders = useMemo(() => {
   //   return fromMarket

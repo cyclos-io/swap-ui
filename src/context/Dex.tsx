@@ -29,6 +29,8 @@ import { useTokenContext } from "./Token";
 const BASE_TAKER_FEE_BPS = 0.0022;
 export const FEE_MULTIPLIER = 1 - BASE_TAKER_FEE_BPS;
 
+type Fetching = "fetching";
+
 // Get OpenOrders public key for swap instructions
 // Callback functions to add and close open order accounts
 type DexContext = {
@@ -38,15 +40,15 @@ type DexContext = {
 
   openOrders: Omit<Map<string, OpenOrders[]>, "set" | "clear" | "delete">;
   openOrdersActions: Actions<string, OpenOrders[]>;
-  markets: Omit<Map<string, Market>, "set" | "clear" | "delete">;
-  marketsActions: Actions<string, Market>;
+  markets: Omit<Map<string, Market | Fetching>, "set" | "clear" | "delete">;
+  marketsActions: Actions<string, Market | Fetching>;
 
 };
 export const _DexContext = React.createContext<DexContext | null>(null);
 
 export function DexContextProvider(props: any) {
   const [openOrders, openOrdersActions] = useMap<string, Array<OpenOrders>>(new Map())
-  const [markets, marketsActions] = useMap<string, Market>(new Map())
+  const [markets, marketsActions] = useMap<string, Market | Fetching>(new Map())
   const swapClient = props.swapClient;
 
   // Removes the given open orders from the context.
@@ -136,7 +138,7 @@ export function useOpenOrderAccounts(market?: Market) {
  * @param market public key
  * @returns Market | undefined
  */
-export function useMarket(market?: PublicKey): Market | undefined {
+export function useMarket(market?: PublicKey, caller?: string): Market | undefined {
   const { provider } = useTokenContext()
   const { markets, marketsActions } = useDexContext()
 
@@ -146,10 +148,16 @@ export function useMarket(market?: PublicKey): Market | undefined {
     }
     const marketKey = market.toString()
     const savedMarket = markets.get(marketKey)
-    if (savedMarket) {
+    if (savedMarket === 'fetching') {
+      console.log('Market fetch in progress')
+      return undefined;
+    } else if (savedMarket) {
+      console.log('Found saved market')
       return savedMarket;
     }
 
+    console.log('Fetching market')
+    marketsActions.set(marketKey, 'fetching')
     const fetchedMarket = await Market.load(
       provider.connection,
       market,
@@ -166,114 +174,114 @@ export function useMarket(market?: PublicKey): Market | undefined {
 // Lazy load the bids and slabs for a given market.
 // Used to find price impact and bbo
 export function useMarketSlabs(market?: PublicKey): Slabs | undefined {
-  const { swapClient } = useDexContext();
-  const marketClient = useMarket(market);
-  const [refresh, setRefresh] = useState(0);
+  // const { swapClient } = useDexContext();
+  // const marketClient = useMarket(market);
+  // const [refresh, setRefresh] = useState(0);
 
-  const asyncOrderbook = useAsync(async () => {
-    if (!market || !marketClient) {
-      return undefined;
-    }
-    if (_SLAB_CACHE.get(market.toString())) {
-      return _SLAB_CACHE.get(market.toString());
-    }
+  // const asyncOrderbook = useAsync(async () => {
+  //   if (!market || !marketClient) {
+  //     return undefined;
+  //   }
+  //   if (_SLAB_CACHE.get(market.toString())) {
+  //     return _SLAB_CACHE.get(market.toString());
+  //   }
 
-    const orderbook = new Promise<Slabs>(async (resolve) => {
-      const [bids, asks] = await Promise.all([
-        marketClient.loadBids(swapClient.program.provider.connection),
-        marketClient.loadAsks(swapClient.program.provider.connection),
-      ]);
+  //   const orderbook = new Promise<Slabs>(async (resolve) => {
+  //     const [bids, asks] = await Promise.all([
+  //       marketClient.loadBids(swapClient.program.provider.connection),
+  //       marketClient.loadAsks(swapClient.program.provider.connection),
+  //     ]);
 
-      resolve({
-        bids,
-        asks,
-      });
-    });
+  //     resolve({
+  //       bids,
+  //       asks,
+  //     });
+  //   });
 
-    _SLAB_CACHE.set(market.toString(), orderbook);
+  //   _SLAB_CACHE.set(market.toString(), orderbook);
 
-    return orderbook;
-  }, [refresh, swapClient.program.provider.connection, market, marketClient]);
+  //   return orderbook;
+  // }, [refresh, swapClient.program.provider.connection, market, marketClient]);
 
-  // Stream in bids updates.
-  useEffect(() => {
-    let listener: number | undefined;
-    if (marketClient?.bidsAddress) {
-      listener = swapClient.program.provider.connection.onAccountChange(
-        marketClient?.bidsAddress,
-        async (info) => {
-          const bids = OrderbookSide.decode(marketClient, info.data);
-          const orderbook = await _SLAB_CACHE.get(
-            marketClient.address.toString()
-          );
-          const oldBestBid = orderbook?.bids.items(true).next().value;
-          const newBestBid = bids.items(true).next().value;
-          if (
-            orderbook &&
-            oldBestBid &&
-            newBestBid &&
-            oldBestBid.price !== newBestBid.price
-          ) {
-            orderbook.bids = bids;
-            setRefresh((r) => r + 1);
-          }
-        }
-      );
-    }
-    return () => {
-      if (listener) {
-        swapClient.program.provider.connection.removeAccountChangeListener(
-          listener
-        );
-      }
-    };
-  }, [
-    marketClient,
-    marketClient?.bidsAddress,
-    swapClient.program.provider.connection,
-  ]);
+  // // Stream in bids updates.
+  // useEffect(() => {
+  //   let listener: number | undefined;
+  //   if (marketClient?.bidsAddress) {
+  //     listener = swapClient.program.provider.connection.onAccountChange(
+  //       marketClient?.bidsAddress,
+  //       async (info) => {
+  //         const bids = OrderbookSide.decode(marketClient, info.data);
+  //         const orderbook = await _SLAB_CACHE.get(
+  //           marketClient.address.toString()
+  //         );
+  //         const oldBestBid = orderbook?.bids.items(true).next().value;
+  //         const newBestBid = bids.items(true).next().value;
+  //         if (
+  //           orderbook &&
+  //           oldBestBid &&
+  //           newBestBid &&
+  //           oldBestBid.price !== newBestBid.price
+  //         ) {
+  //           orderbook.bids = bids;
+  //           setRefresh((r) => r + 1);
+  //         }
+  //       }
+  //     );
+  //   }
+  //   return () => {
+  //     if (listener) {
+  //       swapClient.program.provider.connection.removeAccountChangeListener(
+  //         listener
+  //       );
+  //     }
+  //   };
+  // }, [
+  //   marketClient,
+  //   marketClient?.bidsAddress,
+  //   swapClient.program.provider.connection,
+  // ]);
 
-  // Stream in asks updates.
-  useEffect(() => {
-    let listener: number | undefined;
-    if (marketClient?.asksAddress) {
-      listener = swapClient.program.provider.connection.onAccountChange(
-        marketClient?.asksAddress,
-        async (info) => {
-          const asks = OrderbookSide.decode(marketClient, info.data);
-          const orderbook = await _SLAB_CACHE.get(
-            marketClient.address.toString()
-          );
-          const oldBestOffer = orderbook?.asks.items(false).next().value;
-          const newBestOffer = asks.items(false).next().value;
-          if (
-            orderbook &&
-            oldBestOffer &&
-            newBestOffer &&
-            oldBestOffer.price !== newBestOffer.price
-          ) {
-            orderbook.asks = asks;
-            setRefresh((r) => r + 1);
-          }
-        }
-      );
-    }
-    return () => {
-      if (listener) {
-        swapClient.program.provider.connection.removeAccountChangeListener(
-          listener
-        );
-      }
-    };
-  }, [
-    marketClient,
-    marketClient?.bidsAddress,
-    swapClient.program.provider.connection,
-  ]);
+  // // Stream in asks updates.
+  // useEffect(() => {
+  //   let listener: number | undefined;
+  //   if (marketClient?.asksAddress) {
+  //     listener = swapClient.program.provider.connection.onAccountChange(
+  //       marketClient?.asksAddress,
+  //       async (info) => {
+  //         const asks = OrderbookSide.decode(marketClient, info.data);
+  //         const orderbook = await _SLAB_CACHE.get(
+  //           marketClient.address.toString()
+  //         );
+  //         const oldBestOffer = orderbook?.asks.items(false).next().value;
+  //         const newBestOffer = asks.items(false).next().value;
+  //         if (
+  //           orderbook &&
+  //           oldBestOffer &&
+  //           newBestOffer &&
+  //           oldBestOffer.price !== newBestOffer.price
+  //         ) {
+  //           orderbook.asks = asks;
+  //           setRefresh((r) => r + 1);
+  //         }
+  //       }
+  //     );
+  //   }
+  //   return () => {
+  //     if (listener) {
+  //       swapClient.program.provider.connection.removeAccountChangeListener(
+  //         listener
+  //       );
+  //     }
+  //   };
+  // }, [
+  //   marketClient,
+  //   marketClient?.bidsAddress,
+  //   swapClient.program.provider.connection,
+  // ]);
 
-  if (asyncOrderbook.result) {
-    return asyncOrderbook.result;
-  }
+  // if (asyncOrderbook.result) {
+  //   return asyncOrderbook.result;
+  // }
 
   return undefined;
 }

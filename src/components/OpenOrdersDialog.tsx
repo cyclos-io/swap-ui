@@ -76,7 +76,7 @@ export default function OpenOrdersDialog({
 function OpenOrdersAccounts() {
   const styles = useStyles();
 
-  return (<></>)
+  return <></>;
 
   // const { openOrders } = useDexContext();
   // const openOrdersEntries: Array<[PublicKey, OpenOrders[]]> = useMemo(() => {

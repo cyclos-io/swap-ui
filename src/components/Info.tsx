@@ -18,7 +18,7 @@ import {
   usePriceImpact,
   useRoute,
 } from "../context/Dex";
-import { getSwapFair, useSwapContext } from "../context/Swap";
+import { useSwapFair, useSwapContext } from "../context/Swap";
 import { useTokenInfo } from "../context/TokenList";
 import { SettingsButton } from "./Settings";
 
@@ -48,7 +48,7 @@ export function InfoLabel() {
     showReversePrices,
     setShowReversePrices,
   } = useSwapContext();
-  const fair = getSwapFair(showReversePrices);
+  const fair = useSwapFair(showReversePrices);
   const fromTokenInfo = useTokenInfo(fromMint);
   const toTokenInfo = useTokenInfo(toMint);
 
