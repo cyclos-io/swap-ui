@@ -195,7 +195,7 @@ export default function SwapCard({
   }, [isUnsettledAmt]);
 
   return (
-    <div className={styles.container} >
+    <div className={styles.container}>
       <Card className={styles.card} style={containerStyle}>
         <SwapHeader />
         <div style={contentStyle}>
@@ -230,8 +230,8 @@ export function SwapWarning({
   const styles = useStyles();
   const { settleAll } = useUnsettle();
   return (
-    <Card className={styles.alert} style={style}>
-      <Collapse in={open}>
+    <Collapse in={open} unmountOnExit>
+      <Card className={styles.alert} style={style}>
         <Alert
           severity="warning"
           action={
@@ -263,8 +263,8 @@ export function SwapWarning({
             You have some unsettled balance.
           </Typography>
         </Alert>
-      </Collapse>
-    </Card>
+      </Card>
+    </Collapse>
   );
 }
 
