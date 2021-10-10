@@ -265,7 +265,6 @@ export function useUnsettle(): { isUnsettledAmt: Boolean, settleAll: any } {
 
   let openAccounts: OpenOrders[] = [];
   // useEffect(() => {
-    console.log(openAccounts)
     openOrders.forEach((oo) => {
       oo.forEach((o) => {
         let bTokenFree = +o.baseTokenFree.toString();
@@ -303,7 +302,6 @@ export function useUnsettle(): { isUnsettledAmt: Boolean, settleAll: any } {
     const txns = st.map((t) => ({ tx: t.transaction, signers: t.signers }));
     swapClient.program.provider.sendAll(txns, swapClient.program.provider.opts);
   };
-  console.log(isUnsettledAmt, " is the bool value")
   return { isUnsettledAmt, settleAll };
 }
 

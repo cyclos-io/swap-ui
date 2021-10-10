@@ -1,7 +1,10 @@
 import {
+  Box,
   Button,
   Dialog,
+  DialogActions,
   DialogContent,
+  DialogTitle,
   IconButton,
   Link,
   makeStyles,
@@ -14,6 +17,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Typography,
 } from "@material-ui/core";
 import { Close } from "@material-ui/icons";
@@ -46,9 +50,11 @@ export default function OpenOrdersDialog({
   open: boolean;
   onClose: () => void;
 }) {
+  const { isUnsettledAmt, settleAll } = useUnsettle();
   return (
     <Dialog
-      maxWidth="lg"
+      maxWidth="md"
+      scroll="paper"
       open={open}
       onClose={onClose}
       PaperProps={{
@@ -57,24 +63,29 @@ export default function OpenOrdersDialog({
         },
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-        }}
-      >
+      <Box mx={4} my={2} display="flex" justifyContent="space-between" alignItems="center">
+        <Typography>DEX Accounts</Typography>
         <IconButton
           onClick={onClose}
-          style={{
-            padding: 10,
-          }}
+          size="small"
         >
           <Close />
         </IconButton>
-      </div>
-      <DialogContent style={{ paddingTop: 0 }}>
+      </Box>
+      <DialogContent dividers style={{ paddingTop: 0 }}>
         <OpenOrdersAccounts />
       </DialogContent>
+      <DialogActions>
+        <Button style={{ marginRight: "1rem" }} 
+          color="primary"
+          size="small"
+          variant="contained"
+          disabled={!isUnsettledAmt}
+          onClick={settleAll}
+        >
+          Settle All
+        </Button> 
+      </DialogActions>
     </Dialog>
   );
 }
@@ -82,7 +93,6 @@ export default function OpenOrdersDialog({
 function OpenOrdersAccounts() {
   const styles = useStyles();
   const openOrders = useOpenOrders();
-  const { isUnsettledAmt, settleAll } = useUnsettle();
   const openOrdersEntries: Array<[PublicKey, OpenOrders[]]> = useMemo(() => {
     return Array.from(openOrders.entries()).map(([market, oo]) => [
       new PublicKey(market),
@@ -123,17 +133,6 @@ function OpenOrdersAccounts() {
               );
             })
           )}
-          <TableRow>
-            <TableCell colSpan={8} align="right">
-              <Button
-                color="primary"
-                disabled={!isUnsettledAmt}
-                onClick={settleAll}
-              >
-                Settle All
-              </Button>
-            </TableCell>
-          </TableRow>
         </TableBody>
       </Table>
     </TableContainer>
@@ -174,7 +173,7 @@ function OpenOrdersRow({
     0;
   const closeDisabled =
     ooAccount.baseTokenTotal.toNumber() +
-    ooAccount.quoteTokenTotal.toNumber() !==
+      ooAccount.quoteTokenTotal.toNumber() !==
     0;
 
   const settleFunds = async () => {
@@ -223,7 +222,11 @@ function OpenOrdersRow({
         </Typography>
       </TableCell>
       <TableCell align="center">
-        <Select
+        <TextField
+          select
+          variant="outlined"
+          size="small"
+          style={{ maxWidth: "10rem" }}
           value={ooAccount.address.toString()}
           onChange={(e) =>
             setOoAccount(
@@ -243,7 +246,7 @@ function OpenOrdersRow({
               </MenuItem>
             );
           })}
-        </Select>
+        </TextField>
       </TableCell>
       <TableCell align="center">
         {toDisplay(base, ooAccount.baseTokenTotal.sub(ooAccount.baseTokenFree))}
