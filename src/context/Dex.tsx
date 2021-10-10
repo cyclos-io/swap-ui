@@ -2,7 +2,7 @@ import React, { useContext, useState, useEffect } from "react";
 import * as assert from "assert";
 import { useAsync } from "react-async-hook";
 import { TokenInfo } from "@solana/spl-token-registry";
-import { MintLayout } from "@solana/spl-token";
+import { MintLayout, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { Connection, PublicKey } from "@solana/web3.js";
 import * as anchor from "@project-serum/anchor";
 import { Swap as SwapClient } from "@project-serum/swap";
@@ -236,6 +236,73 @@ export function useMarket(market?: PublicKey): Market | undefined {
   }
 
   return undefined;
+}
+
+
+export function useUnsettle(): { isUnsettledAmt: Boolean, settleAll: any } {
+  const { openOrders, swapClient } = useDexContext();
+
+  let isUnsettledAmt = false;
+  let settleAll = null;
+
+  const connection = swapClient.program.provider.connection;
+  const publicKey = swapClient.program.provider.wallet.publicKey;
+
+  if (!publicKey) return ({ isUnsettledAmt: false, settleAll: undefined });
+
+  const userOwnedTokenAccMap: any = {};
+
+  connection
+    .getParsedTokenAccountsByOwner(publicKey, {
+      programId: TOKEN_PROGRAM_ID,
+    })
+    .then((b) => {
+      b?.value?.forEach((acc) => {
+        userOwnedTokenAccMap[acc.account.data.parsed.info.mint] =
+          acc.pubkey.toString();
+      });
+    });
+
+  let openAccounts: OpenOrders[] = [];
+  // useEffect(() => {
+    openOrders.forEach((oo) => {
+      oo.forEach((o) => {
+        let bTokenFree = +o.baseTokenFree.toString();
+        let qTokenFree = +o.quoteTokenFree.toString();
+        let settle = bTokenFree + qTokenFree == 0;
+        if (!settle) {
+          isUnsettledAmt = true;
+          openAccounts.push(o);
+        }
+      });
+    });
+  // }, [openAccounts])
+
+  settleAll = async () => {
+    let st = await Promise.all(
+      openAccounts.map(async (oo) => {
+        const marketClient = await Market.load(
+          connection,
+          oo.market,
+          {},
+          DEX_PID
+        );
+        const baseMintAdd = marketClient.baseMintAddress.toString();
+        const quoteMintAdd = marketClient.quoteMintAddress.toString();
+        const baseUserAcc = new PublicKey(userOwnedTokenAccMap[baseMintAdd]);
+        const quoteUserAcc = new PublicKey(userOwnedTokenAccMap[quoteMintAdd]);
+        return await marketClient.makeSettleFundsTransaction(
+          connection,
+          oo,
+          baseUserAcc,
+          quoteUserAcc
+        );
+      })
+    );
+    const txns = st.map((t) => ({ tx: t.transaction, signers: t.signers }));
+    swapClient.program.provider.sendAll(txns, swapClient.program.provider.opts);
+  };
+  return { isUnsettledAmt, settleAll };
 }
 
 // Lazy load the orderbook for a given market.

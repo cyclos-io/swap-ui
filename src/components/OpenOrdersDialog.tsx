@@ -1,7 +1,10 @@
 import {
+  Box,
   Button,
   Dialog,
+  DialogActions,
   DialogContent,
+  DialogTitle,
   IconButton,
   Link,
   makeStyles,
@@ -14,6 +17,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Typography,
 } from "@material-ui/core";
 import { Close } from "@material-ui/icons";
@@ -22,7 +26,12 @@ import { OpenOrders } from "@project-serum/serum";
 import { MintInfo } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { useEffect, useMemo, useState } from "react";
-import { useDexContext, useMarket, useOpenOrders } from "../context/Dex";
+import {
+  useDexContext,
+  useMarket,
+  useOpenOrders,
+  useUnsettle,
+} from "../context/Dex";
 import { useMint, useOwnedTokenAccount } from "../context/Token";
 import { useTokenMap } from "../context/TokenList";
 import { DEX_PID } from "../utils/pubkeys";
@@ -41,9 +50,11 @@ export default function OpenOrdersDialog({
   open: boolean;
   onClose: () => void;
 }) {
+  const { isUnsettledAmt, settleAll } = useUnsettle();
   return (
     <Dialog
-      maxWidth="lg"
+      maxWidth="md"
+      scroll="paper"
       open={open}
       onClose={onClose}
       PaperProps={{
@@ -52,24 +63,29 @@ export default function OpenOrdersDialog({
         },
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-        }}
-      >
+      <Box mx={4} my={2} display="flex" justifyContent="space-between" alignItems="center">
+        <Typography>DEX Accounts</Typography>
         <IconButton
           onClick={onClose}
-          style={{
-            padding: 10,
-          }}
+          size="small"
         >
           <Close />
         </IconButton>
-      </div>
-      <DialogContent style={{ paddingTop: 0 }}>
+      </Box>
+      <DialogContent dividers style={{ paddingTop: 0 }}>
         <OpenOrdersAccounts />
       </DialogContent>
+      <DialogActions>
+        <Button style={{ marginRight: "1rem" }} 
+          color="primary"
+          size="small"
+          variant="contained"
+          disabled={!isUnsettledAmt}
+          onClick={settleAll}
+        >
+          Settle All
+        </Button> 
+      </DialogActions>
     </Dialog>
   );
 }
@@ -83,6 +99,7 @@ function OpenOrdersAccounts() {
       oo,
     ]);
   }, [openOrders]);
+  const openOrdersEntriesLen = openOrdersEntries.length;
   return (
     <TableContainer component={Paper} elevation={0}>
       <Table className={styles.table} aria-label="simple table">
@@ -99,15 +116,23 @@ function OpenOrdersAccounts() {
           </TableRow>
         </TableHead>
         <TableBody>
-          {openOrdersEntries.map(([market, oos]) => {
-            return (
-              <OpenOrdersRow
-                key={market.toString()}
-                market={market}
-                openOrders={oos}
-              />
-            );
-          })}
+          {openOrdersEntriesLen === 0 ? (
+            <TableRow>
+              <TableCell align="center" colSpan={8}>
+                No Open Orders Accounts
+              </TableCell>
+            </TableRow>
+          ) : (
+            openOrdersEntries.map(([market, oos]) => {
+              return (
+                <OpenOrdersRow
+                  key={market.toString()}
+                  market={market}
+                  openOrders={oos}
+                />
+              );
+            })
+          )}
         </TableBody>
       </Table>
     </TableContainer>
@@ -188,7 +213,7 @@ function OpenOrdersRow({
       <TableCell component="th" scope="row">
         <Typography>
           <Link
-            href={`https://dex.projectserum.com/#/market/${market.toString()}`}
+            href={`https://dex.cyclos.io/#/market/${market.toString()}`}
             target="_blank"
             rel="noopener"
           >
@@ -197,7 +222,11 @@ function OpenOrdersRow({
         </Typography>
       </TableCell>
       <TableCell align="center">
-        <Select
+        <TextField
+          select
+          variant="outlined"
+          size="small"
+          style={{ maxWidth: "10rem" }}
           value={ooAccount.address.toString()}
           onChange={(e) =>
             setOoAccount(
@@ -217,7 +246,7 @@ function OpenOrdersRow({
               </MenuItem>
             );
           })}
-        </Select>
+        </TextField>
       </TableCell>
       <TableCell align="center">
         {toDisplay(base, ooAccount.baseTokenTotal.sub(ooAccount.baseTokenFree))}

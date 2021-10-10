@@ -7,8 +7,16 @@ import {
   TextField,
   Typography,
   useTheme,
+  IconButton,
+  Collapse,
 } from "@material-ui/core";
-import { ExpandMore, ImportExportRounded } from "@material-ui/icons";
+import { Alert } from "@material-ui/lab";
+import {
+  ExpandMore,
+  ImportExportRounded,
+  WarningOutlined,
+  Close as CloseIcon,
+} from "@material-ui/icons";
 import { BN, Provider } from "@project-serum/anchor";
 import { OpenOrders } from "@project-serum/serum";
 import {
@@ -33,6 +41,7 @@ import {
   useMarket,
   useRoute,
   useRouteVerbose,
+  useUnsettle,
 } from "../context/Dex";
 import {
   useCanCreateAccounts,
@@ -65,11 +74,19 @@ import { InfoButton, InfoLabel } from "./Info";
 import TokenDialog from "./TokenDialog";
 
 const useStyles = makeStyles((theme) => ({
+  container: {
+    width: theme.spacing(54),
+    margin: theme.spacing(0.5),
+  },
   card: {
-    width: theme.spacing(50),
     borderRadius: theme.spacing(2),
     boxShadow: "0px 0px 30px 5px rgba(0,0,0,0.075)",
     padding: theme.spacing(2),
+  },
+  alert: {
+    borderRadius: theme.spacing(2),
+    boxShadow: "0px 0px 30px 5px rgba(0,0,0,0.075)",
+    marginTop: theme.spacing(1),
   },
   tab: {
     width: "50%",
@@ -149,6 +166,12 @@ const useStyles = makeStyles((theme) => ({
     padding: 0,
     fontSize: "14px",
   },
+  settleButton: {
+    backgroundColor: theme.palette.primary.main,
+    color: theme.palette.primary.contrastText,
+    cursor: "pointer",
+    marginLeft: "auto",
+  },
 }));
 
 export default function SwapCard({
@@ -165,19 +188,82 @@ export default function SwapCard({
   connectWalletCallback?: any;
 }) {
   const styles = useStyles();
+  const { isUnsettledAmt } = useUnsettle();
+  let [openWarning, setOpenWarning] = useState(isUnsettledAmt);
+  useMemo(() => {
+    setOpenWarning(isUnsettledAmt);
+  }, [isUnsettledAmt]);
+
   return (
-    <Card className={styles.card} style={containerStyle}>
-      <SwapHeader />
-      <div style={contentStyle}>
-        <SwapFromForm style={swapTokenContainerStyle} />
-        <ArrowButton style={swapTokenContainerStyle} />
-        <SwapToForm style={swapTokenContainerStyle} />
-        <InfoLabel />
-        <SwapButton
-          swapButtonStyle={swapButtonStyle}
-          connectWalletCallback={connectWalletCallback}
-        />
-      </div>
+    <div className={styles.container} >
+      <Card className={styles.card} style={containerStyle}>
+        <SwapHeader />
+        <div style={contentStyle}>
+          <SwapFromForm style={swapTokenContainerStyle} />
+          <ArrowButton style={swapTokenContainerStyle} />
+          <SwapToForm style={swapTokenContainerStyle} />
+          <InfoLabel />
+          <SwapButton
+            swapButtonStyle={swapButtonStyle}
+            connectWalletCallback={connectWalletCallback}
+          />
+        </div>
+      </Card>
+      <SwapWarning
+        style={containerStyle}
+        open={openWarning}
+        setOpen={setOpenWarning}
+      />
+    </div>
+  );
+}
+
+export function SwapWarning({
+  style,
+  open,
+  setOpen,
+}: {
+  style: any;
+  open: any;
+  setOpen: any;
+}) {
+  const styles = useStyles();
+  const { settleAll } = useUnsettle();
+  return (
+    <Card className={styles.alert} style={style}>
+      <Collapse in={open}>
+        <Alert
+          severity="warning"
+          action={
+            <>
+              <Button
+                variant="text"
+                style={{ textTransform: "none" }}
+                size="small"
+                color="primary"
+                onClick={settleAll}
+              >
+                Settle All
+              </Button>
+              &nbsp;&nbsp;
+              <IconButton
+                aria-label="close"
+                color="inherit"
+                size="small"
+                onClick={() => {
+                  setOpen(false);
+                }}
+              >
+                <CloseIcon fontSize="inherit" />
+              </IconButton>
+            </>
+          }
+        >
+          <Typography variant="caption">
+            You have some unsettled balance.
+          </Typography>
+        </Alert>
+      </Collapse>
     </Card>
   );
 }

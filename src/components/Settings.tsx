@@ -78,8 +78,9 @@ export function SettingsButton() {
               }}
               PaperProps={{
                 style: {
-                  borderRadius: "10px",
+                  borderRadius: "0.5rem",
                   boxShadow: "0px 0px 30px 5px rgba(0,0,0,0.075)",
+                  marginTop: "-0.5rem"
                 },
               }}
             >
@@ -175,12 +176,14 @@ function SettingsDetails() {
           <CloseNewAccountsSwitch />
         </div>
         <Button
-          variant="contained"
+          style={{ textTransform: "none" }}
+          variant="outlined"
+          color="primary"
           fullWidth
           disabled={swapClient.program.provider.wallet.publicKey === null}
           onClick={() => setShowSettingsDialog(true)}
         >
-          Manage Dex Accounts
+          Manage DEX Accounts
         </Button>
       </div>
       <OpenOrdersDialog
