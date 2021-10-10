@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect } from "react";
+import React, { useContext, useState, ReactNode } from "react";
 import { useAsync } from "react-async-hook";
 import { TokenInfo } from "@solana/spl-token-registry";
 import { Connection, PublicKey } from "@solana/web3.js";
@@ -23,12 +23,11 @@ import {
 import { useTokenListContext, useTokenInfo } from "./TokenList";
 import { fetchSolletInfo, requestWormholeSwapMarketIfNeeded } from "./Sollet";
 import { useSwapContext, useIsWrapSol } from "./Swap";
-import { Actions, useMap } from "usehooks-ts";
+import { Actions, useInterval, useMap } from "usehooks-ts";
 import { useTokenContext } from "./Token";
 
 const BASE_TAKER_FEE_BPS = 0.0022;
 export const FEE_MULTIPLIER = 1 - BASE_TAKER_FEE_BPS;
-
 type Fetching = "fetching";
 
 // Get OpenOrders public key for swap instructions
@@ -37,28 +36,41 @@ type DexContext = {
   closeOpenOrders: (openOrder: OpenOrders) => void;
   addOpenOrderAccount: (market: PublicKey, accountData: OpenOrders) => void;
   swapClient: SwapClient;
-
   openOrders: Omit<Map<string, OpenOrders[]>, "set" | "clear" | "delete">;
   openOrdersActions: Actions<string, OpenOrders[]>;
   markets: Omit<Map<string, Market | Fetching>, "set" | "clear" | "delete">;
   marketsActions: Actions<string, Market | Fetching>;
-
+  slabMap: Omit<Map<string, Slabs>, "set" | "clear" | "delete">;
+  slabMapActions: Actions<string, Slabs>;
+  marketToPoll: string | undefined;
+  setMarketToPoll: React.Dispatch<React.SetStateAction<string | undefined>>;
 };
 export const _DexContext = React.createContext<DexContext | null>(null);
 
-export function DexContextProvider(props: any) {
-  const [openOrders, openOrdersActions] = useMap<string, Array<OpenOrders>>(new Map())
-  const [markets, marketsActions] = useMap<string, Market | Fetching>(new Map())
+type DexContextProviderProps = {
+  swapClient: SwapClient;
+  children: ReactNode;
+};
+
+export function DexContextProvider(props: DexContextProviderProps) {
+  const [openOrders, openOrdersActions] = useMap<string, Array<OpenOrders>>(
+    new Map()
+  );
+  const [markets, marketsActions] = useMap<string, Market | Fetching>(
+    new Map()
+  );
+  const [slabMap, slabMapActions] = useMap<string, Slabs>(new Map());
+  const [marketToPoll, setMarketToPoll] = useState<string>();
+  // TODO poll second market if multi market swap
+
   const swapClient = props.swapClient;
+  const provider = swapClient.program.provider;
 
   // Removes the given open orders from the context.
   const closeOpenOrders = async (openOrder: OpenOrders) => {
     // TODO remove function
-
     // const openOrderMarket = openOrder.market.toString()
-
     // const newOoAccounts = new Map(openOrders);
-
     // // Filter out, otherwise delete
     // const filteredOpenOrders = newOoAccounts
     //   .get(openOrderMarket)
@@ -81,6 +93,23 @@ export function DexContextProvider(props: any) {
     // setIsLoaded(true);
   };
 
+  useInterval(
+    async () => {
+      if (!marketToPoll) {
+        return;
+      }
+      console.log("polling for market", marketToPoll);
+      const marketClient = markets.get(marketToPoll);
+      if (!marketClient || marketClient === "fetching") {
+        return;
+      }
+      const bids = await marketClient.loadBids(provider.connection);
+      const asks = await marketClient.loadAsks(provider.connection);
+      slabMapActions.set(marketToPoll, { bids, asks });
+    },
+    marketToPoll ? 5000 : null
+  );
+
   return (
     <_DexContext.Provider
       value={{
@@ -91,6 +120,10 @@ export function DexContextProvider(props: any) {
         openOrdersActions,
         markets,
         marketsActions,
+        slabMap,
+        slabMapActions,
+        marketToPoll,
+        setMarketToPoll,
       }}
     >
       {props.children}
@@ -110,27 +143,27 @@ export function useDexContext(): DexContext {
  * Return all OpenOrder accounts of a user for a given market
  */
 export function useOpenOrderAccounts(market?: Market) {
-  const { provider } = useTokenContext()
-  const { openOrders, openOrdersActions } = useDexContext()
+  const { provider } = useTokenContext();
+  const { openOrders, openOrdersActions } = useDexContext();
 
   return useAsync(async () => {
     if (!market) {
-      return undefined
+      return undefined;
     }
-    const marketKey = market.address.toString()
-    const savedOpenOrders = openOrders.get(marketKey)
+    const marketKey = market.address.toString();
+    const savedOpenOrders = openOrders.get(marketKey);
     if (savedOpenOrders) {
-      return savedOpenOrders
+      return savedOpenOrders;
     }
     // Fetch if not saved in cache
     const fetchedOpenOrders = await market.findOpenOrdersAccountsForOwner(
       provider.connection,
       provider.wallet.publicKey
-    )
+    );
     // Triggers rerender, where saved value will be returned
-    openOrdersActions.set(marketKey, fetchedOpenOrders)
-    return fetchedOpenOrders
-  }, [market])
+    openOrdersActions.set(marketKey, fetchedOpenOrders);
+    return fetchedOpenOrders;
+  }, [market]);
 }
 
 /**
@@ -138,152 +171,55 @@ export function useOpenOrderAccounts(market?: Market) {
  * @param market public key
  * @returns Market | undefined
  */
-export function useMarket(market?: PublicKey, caller?: string): Market | undefined {
-  const { provider } = useTokenContext()
-  const { markets, marketsActions } = useDexContext()
+export function useMarket(
+  market?: PublicKey,
+  caller?: string
+): Market | undefined {
+  const { provider } = useTokenContext();
+  const { markets, marketsActions } = useDexContext();
 
   const asyncMarket = useAsync(async () => {
     if (!market) {
       return undefined;
     }
-    const marketKey = market.toString()
-    const savedMarket = markets.get(marketKey)
-    if (savedMarket === 'fetching') {
-      console.log('Market fetch in progress')
+    const marketKey = market.toString();
+    const savedMarket = markets.get(marketKey);
+    if (savedMarket === "fetching") {
+      console.log("Market fetch in progress");
       return undefined;
     } else if (savedMarket) {
-      console.log('Found saved market')
+      console.log("Found saved market");
       return savedMarket;
     }
 
-    console.log('Fetching market')
-    marketsActions.set(marketKey, 'fetching')
+    console.log("Fetching market");
+    marketsActions.set(marketKey, "fetching");
     const fetchedMarket = await Market.load(
       provider.connection,
       market,
       provider.opts,
       DEX_PID
     );
-    marketsActions.set(marketKey, fetchedMarket)
+    marketsActions.set(marketKey, fetchedMarket);
     return fetchedMarket;
   }, [market]);
 
-  return asyncMarket.result
+  return asyncMarket.result;
 }
 
-// Lazy load the bids and slabs for a given market.
-// Used to find price impact and bbo
+/**
+ * Get bid and ask slabs for the given market
+ * Used to calculate BBO and price impact
+ * @param market
+ * @returns Slabs
+ */
 export function useMarketSlabs(market?: PublicKey): Slabs | undefined {
-  // const { swapClient } = useDexContext();
-  // const marketClient = useMarket(market);
-  // const [refresh, setRefresh] = useState(0);
-
-  // const asyncOrderbook = useAsync(async () => {
-  //   if (!market || !marketClient) {
-  //     return undefined;
-  //   }
-  //   if (_SLAB_CACHE.get(market.toString())) {
-  //     return _SLAB_CACHE.get(market.toString());
-  //   }
-
-  //   const orderbook = new Promise<Slabs>(async (resolve) => {
-  //     const [bids, asks] = await Promise.all([
-  //       marketClient.loadBids(swapClient.program.provider.connection),
-  //       marketClient.loadAsks(swapClient.program.provider.connection),
-  //     ]);
-
-  //     resolve({
-  //       bids,
-  //       asks,
-  //     });
-  //   });
-
-  //   _SLAB_CACHE.set(market.toString(), orderbook);
-
-  //   return orderbook;
-  // }, [refresh, swapClient.program.provider.connection, market, marketClient]);
-
-  // // Stream in bids updates.
-  // useEffect(() => {
-  //   let listener: number | undefined;
-  //   if (marketClient?.bidsAddress) {
-  //     listener = swapClient.program.provider.connection.onAccountChange(
-  //       marketClient?.bidsAddress,
-  //       async (info) => {
-  //         const bids = OrderbookSide.decode(marketClient, info.data);
-  //         const orderbook = await _SLAB_CACHE.get(
-  //           marketClient.address.toString()
-  //         );
-  //         const oldBestBid = orderbook?.bids.items(true).next().value;
-  //         const newBestBid = bids.items(true).next().value;
-  //         if (
-  //           orderbook &&
-  //           oldBestBid &&
-  //           newBestBid &&
-  //           oldBestBid.price !== newBestBid.price
-  //         ) {
-  //           orderbook.bids = bids;
-  //           setRefresh((r) => r + 1);
-  //         }
-  //       }
-  //     );
-  //   }
-  //   return () => {
-  //     if (listener) {
-  //       swapClient.program.provider.connection.removeAccountChangeListener(
-  //         listener
-  //       );
-  //     }
-  //   };
-  // }, [
-  //   marketClient,
-  //   marketClient?.bidsAddress,
-  //   swapClient.program.provider.connection,
-  // ]);
-
-  // // Stream in asks updates.
-  // useEffect(() => {
-  //   let listener: number | undefined;
-  //   if (marketClient?.asksAddress) {
-  //     listener = swapClient.program.provider.connection.onAccountChange(
-  //       marketClient?.asksAddress,
-  //       async (info) => {
-  //         const asks = OrderbookSide.decode(marketClient, info.data);
-  //         const orderbook = await _SLAB_CACHE.get(
-  //           marketClient.address.toString()
-  //         );
-  //         const oldBestOffer = orderbook?.asks.items(false).next().value;
-  //         const newBestOffer = asks.items(false).next().value;
-  //         if (
-  //           orderbook &&
-  //           oldBestOffer &&
-  //           newBestOffer &&
-  //           oldBestOffer.price !== newBestOffer.price
-  //         ) {
-  //           orderbook.asks = asks;
-  //           setRefresh((r) => r + 1);
-  //         }
-  //       }
-  //     );
-  //   }
-  //   return () => {
-  //     if (listener) {
-  //       swapClient.program.provider.connection.removeAccountChangeListener(
-  //         listener
-  //       );
-  //     }
-  //   };
-  // }, [
-  //   marketClient,
-  //   marketClient?.bidsAddress,
-  //   swapClient.program.provider.connection,
-  // ]);
-
-  // if (asyncOrderbook.result) {
-  //   return asyncOrderbook.result;
-  // }
-
-  return undefined;
+  const { slabMap, marketToPoll, setMarketToPoll } = useDexContext();
+  const marketKey = market?.toString();
+  if (marketKey && marketToPoll !== marketKey) {
+    setMarketToPoll(marketKey);
+  }
+  return marketKey ? slabMap.get(marketKey) : undefined;
 }
 
 export function useMarketName(market: PublicKey): string | null {
@@ -588,6 +524,3 @@ type Bbo = {
   bestOffer?: number;
   mid?: number;
 };
-
-// To find price impact and BBO
-const _SLAB_CACHE = new Map<string, Promise<Slabs>>();
