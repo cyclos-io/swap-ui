@@ -107,7 +107,7 @@ export function DexContextProvider(props: DexContextProviderProps) {
       const asks = await marketClient.loadAsks(provider.connection);
       slabMapActions.set(marketToPoll, { bids, asks });
     },
-    marketToPoll ? 5000 : null
+    marketToPoll ? 10000 : null
   );
 
   return (

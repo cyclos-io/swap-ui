@@ -1,7 +1,7 @@
 import React, { useContext, useState } from "react";
 import { Provider } from "@project-serum/anchor";
 import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import useInterval from "@use-it/interval";
+import { useInterval } from "usehooks-ts";
 
 import { SOL_MINT } from "../utils/pubkeys";
 import {
@@ -13,7 +13,7 @@ import {
 
 export type TokenContext = {
   provider: Provider;
-  userTokens?: FetchedTokens;
+  userTokens?: FetchedTokens | "fetching";
 };
 
 const _TokenContext = React.createContext<TokenContext | null>(null);
@@ -30,16 +30,22 @@ export function TokenContextProvider({
   provider: Provider;
   children: React.ReactNode;
 }) {
-  const [userTokens, setUserTokens] = useState<FetchedTokens>();
+  const [userTokens, setUserTokens] = useState<FetchedTokens | "fetching">();
   const poll = provider.wallet.publicKey && provider.connection;
-  const pollDuration = poll
-    ? !userTokens // no delay for first fetch
-      ? 0
-      : 5000
+  let pollDuration = poll
+    ? 10000
     : null;
 
+  if (poll && !userTokens && userTokens !== "fetching") {
+    pollDuration = 1000
+  }
   useInterval(async () => {
+    console.log('Polling for tokens')
     try {
+      if (!userTokens) {
+        setUserTokens("fetching");
+      }
+
       const fetchedTokens = await fetchUserTokens(
         provider.wallet.publicKey.toString()
       );
@@ -92,7 +98,7 @@ export function useOwnedTokenAccount(
 ): SavedTokenInfo | undefined | null {
   const { userTokens } = useTokenContext();
   // Loading
-  if (mint === undefined) {
+  if (mint === undefined || userTokens === "fetching") {
     return undefined;
   }
 

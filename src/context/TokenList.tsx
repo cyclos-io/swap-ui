@@ -12,6 +12,7 @@ import { WRAPPED_SOL_MINT } from "@project-serum/serum/lib/token-instructions";
 import { LocalStorage } from "../utils/localStorage";
 import { SOL_MINT } from "../utils/pubkeys";
 import { useTokenContext } from "./Token";
+import { FetchedTokens } from "../utils/userTokens";
 
 interface TokenCommonBaseInfo extends TokenInfo {
   isCommonBase?: boolean;
@@ -102,12 +103,12 @@ export function TokenListContextProvider(props: Props) {
     // Owned tokens sorted by moneyary worth
     const ownedTokens = allTokens
       .filter((token) => {
-        return userTokens?.[token.address] !== undefined;
+        return userTokens !== "fetching" && userTokens?.[token.address] !== undefined;
       })
       .sort((a: TokenInfo, b: TokenInfo) => {
-        const tokenA = userTokens?.[a.address];
+        const tokenA = (userTokens as FetchedTokens)?.[a.address];
         const aWorth = (tokenA?.tokenAmount ?? 0) * (tokenA?.priceUsdt ?? 0);
-        const tokenB = userTokens?.[b.address];
+        const tokenB = (userTokens as FetchedTokens)?.[b.address];
         const bWorth = (tokenB?.tokenAmount ?? 0) * (tokenB?.priceUsdt ?? 0);
 
         return bWorth - aWorth;
@@ -115,7 +116,7 @@ export function TokenListContextProvider(props: Props) {
     // Not owned tokens in alphabetical order
     const notOwnedtokens = allTokens
       .filter((token) => {
-        return userTokens?.[token.address] === undefined;
+        return (userTokens as FetchedTokens)?.[token.address] === undefined;
       })
       .sort((a: TokenInfo, b: TokenInfo) =>
         a.symbol < b.symbol ? -1 : a.symbol > b.symbol ? 1 : 0
