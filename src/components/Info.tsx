@@ -14,9 +14,9 @@ import { PublicKey } from "@solana/web3.js";
 import PopupState, { bindPopover, bindTrigger } from "material-ui-popup-state";
 import {
   useBbo,
+  useDexContext,
   useMarketName,
   usePriceImpact,
-  useRoute,
 } from "../context/Dex";
 import { useSwapFair, useSwapContext } from "../context/Swap";
 import { useTokenInfo } from "../context/TokenList";
@@ -53,8 +53,8 @@ export function InfoLabel() {
   const toTokenInfo = useTokenInfo(toMint);
 
   // Use last route item to find impact
-  const route = useRoute(fromMint, toMint);
-  const impact = usePriceImpact(route?.at(-1));
+  const { route } = useDexContext();
+  const impact = usePriceImpact(route?.markets?.at(-1));
 
   return (
     <Box my={2}>
@@ -124,7 +124,7 @@ export function InfoLabel() {
   );
 }
 
-export function InfoButton({ route }: { route: PublicKey[] | null }) {
+export function InfoButton({ route }: { route?: PublicKey[] }) {
   const styles = useStyles();
   const theme = useTheme();
   return (
@@ -164,7 +164,7 @@ export function InfoButton({ route }: { route: PublicKey[] | null }) {
   );
 }
 
-function InfoDetails({ route }: { route: PublicKey[] | null }) {
+function InfoDetails({ route }: { route?: PublicKey[] }) {
   const { fromMint, toMint } = useSwapContext();
   const fromTokenInfo = useTokenInfo(fromMint);
   const toTokenInfo = useTokenInfo(toMint);

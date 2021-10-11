@@ -30,8 +30,11 @@ const BASE_TAKER_FEE_BPS = 0.0022;
 export const FEE_MULTIPLIER = 1 - BASE_TAKER_FEE_BPS;
 type Fetching = "fetching";
 
-// Get OpenOrders public key for swap instructions
-// Callback functions to add and close open order accounts
+export type Slabs = {
+  bids: OrderbookSide;
+  asks: OrderbookSide;
+};
+
 type DexContext = {
   closeOpenOrders: (openOrder: OpenOrders) => void;
   addOpenOrderAccount: (market: PublicKey, accountData: OpenOrders) => void;
@@ -42,8 +45,8 @@ type DexContext = {
   marketsActions: Actions<string, Market | Fetching>;
   slabMap: Omit<Map<string, Slabs>, "set" | "clear" | "delete">;
   slabMapActions: Actions<string, Slabs>;
-  marketToPoll: string | undefined;
-  setMarketToPoll: React.Dispatch<React.SetStateAction<string | undefined>>;
+  route: Route | undefined;
+  updateRoute: (fromMint: PublicKey, toMint: PublicKey) => Promise<void>;
 };
 export const _DexContext = React.createContext<DexContext | null>(null);
 
@@ -52,7 +55,13 @@ type DexContextProviderProps = {
   children: ReactNode;
 };
 
+export type Route = {
+  markets: PublicKey[];
+  kind: RouteKind;
+};
+
 export function DexContextProvider(props: DexContextProviderProps) {
+  const { wormholeMap, solletMap } = useTokenListContext();
   const [openOrders, openOrdersActions] = useMap<string, Array<OpenOrders>>(
     new Map()
   );
@@ -60,8 +69,7 @@ export function DexContextProvider(props: DexContextProviderProps) {
     new Map()
   );
   const [slabMap, slabMapActions] = useMap<string, Slabs>(new Map());
-  const [marketToPoll, setMarketToPoll] = useState<string>();
-  // TODO poll second market if multi market swap
+  const [route, setRoute] = useState<Route>();
 
   const swapClient = props.swapClient;
   const provider = swapClient.program.provider;
@@ -93,21 +101,61 @@ export function DexContextProvider(props: DexContextProviderProps) {
     // setIsLoaded(true);
   };
 
+  // Types of routes.
+  //
+  // 1. Direct trades on USDC quoted markets.
+  // 2. Transitive trades across two USDC qutoed markets.
+  // 3. Wormhole <-> Sollet one-to-one swap markets.
+  // 4. Wormhole <-> Native one-to-one swap markets.
+  //
+  const updateRoute = async (fromMint: PublicKey, toMint: PublicKey) => {
+    const swapMarket = await wormholeSwapMarket(
+      provider.connection,
+      fromMint,
+      toMint,
+      wormholeMap,
+      solletMap
+    );
+    if (swapMarket) {
+      const [wormholeMarket, kind] = swapMarket;
+      setRoute({ markets: [wormholeMarket], kind });
+    } else {
+      // Look up token list to find usdx market route
+      const markets = swapClient.route(
+        fromMint.equals(SOL_MINT) ? WRAPPED_SOL_MINT : fromMint,
+        toMint.equals(SOL_MINT) ? WRAPPED_SOL_MINT : toMint
+      );
+      console.log("Got route markets", markets);
+
+      if (markets) {
+        console.log("Route set");
+        const kind: RouteKind = "usdx";
+        setRoute({ markets, kind });
+      } else {
+        console.log("Route unset");
+        setRoute(undefined);
+      }
+    }
+  };
+
   useInterval(
     async () => {
-      if (!marketToPoll) {
+      if (!route) {
         return;
       }
-      console.log("polling for market", marketToPoll);
-      const marketClient = markets.get(marketToPoll);
-      if (!marketClient || marketClient === "fetching") {
-        return;
-      }
-      const bids = await marketClient.loadBids(provider.connection);
-      const asks = await marketClient.loadAsks(provider.connection);
-      slabMapActions.set(marketToPoll, { bids, asks });
+      console.log("polling for route", route);
+      route.markets.forEach(async (market) => {
+        const marketKey = market.toString();
+        const marketClient = markets.get(marketKey);
+        if (!marketClient || marketClient === "fetching") {
+          return;
+        }
+        const bids = await marketClient.loadBids(provider.connection);
+        const asks = await marketClient.loadAsks(provider.connection);
+        slabMapActions.set(marketKey, { bids, asks });
+      });
     },
-    marketToPoll ? 10000 : null
+    route ? 10000 : null
   );
 
   return (
@@ -122,8 +170,8 @@ export function DexContextProvider(props: DexContextProviderProps) {
         marketsActions,
         slabMap,
         slabMapActions,
-        marketToPoll,
-        setMarketToPoll,
+        route,
+        updateRoute,
       }}
     >
       {props.children}
@@ -214,11 +262,8 @@ export function useMarket(
  * @returns Slabs
  */
 export function useMarketSlabs(market?: PublicKey): Slabs | undefined {
-  const { slabMap, marketToPoll, setMarketToPoll } = useDexContext();
+  const { slabMap } = useDexContext();
   const marketKey = market?.toString();
-  if (marketKey && marketToPoll !== marketKey) {
-    setMarketToPoll(marketKey);
-  }
   return marketKey ? slabMap.get(marketKey) : undefined;
 }
 
@@ -293,21 +338,21 @@ export function useFairRoute(
   fromMint: PublicKey,
   toMint: PublicKey
 ): number | undefined {
-  const route = useRoute(fromMint, toMint);
-  const fromBbo = useBbo(route ? route[0] : undefined);
-  const fromMarket = useMarket(route ? route[0] : undefined);
-  const toBbo = useBbo(route ? route[1] : undefined);
+  const { route } = useDexContext();
+  const fromBbo = useBbo(route?.markets[0]);
+  const fromMarket = useMarket(route?.markets[0]);
+  const toBbo = useBbo(route?.markets[1]);
   const { isWrapUnwrap } = useIsWrapSol(fromMint, toMint);
 
   if (isWrapUnwrap) {
     return undefined;
   }
 
-  if (route === null) {
+  if (!route) {
     return undefined;
   }
 
-  if (route.length === 1 && fromBbo !== undefined) {
+  if (route.markets.length === 1 && fromBbo !== undefined) {
     if (fromMarket === undefined) {
       return undefined;
     }
@@ -331,64 +376,6 @@ export function useFairRoute(
   }
   return toBbo.bestOffer / fromBbo.bestBid;
 }
-
-export function useRoute(
-  fromMint: PublicKey,
-  toMint: PublicKey
-): Array<PublicKey> | null {
-  const route = useRouteVerbose(fromMint, toMint);
-  if (route === null) {
-    return null;
-  }
-  return route.markets;
-}
-
-// Types of routes.
-//
-// 1. Direct trades on USDC quoted markets.
-// 2. Transitive trades across two USDC qutoed markets.
-// 3. Wormhole <-> Sollet one-to-one swap markets.
-// 4. Wormhole <-> Native one-to-one swap markets.
-//
-export function useRouteVerbose(
-  fromMint: PublicKey,
-  toMint: PublicKey
-): { markets: Array<PublicKey>; kind: RouteKind } | null {
-  const { swapClient } = useDexContext();
-  const { wormholeMap, solletMap } = useTokenListContext();
-  const asyncRoute = useAsync(async () => {
-    const swapMarket = await wormholeSwapMarket(
-      swapClient.program.provider.connection,
-      fromMint,
-      toMint,
-      wormholeMap,
-      solletMap
-    );
-    if (swapMarket !== null) {
-      const [wormholeMarket, kind] = swapMarket;
-      return { markets: [wormholeMarket], kind };
-    }
-    const markets = swapClient.route(
-      fromMint.equals(SOL_MINT) ? WRAPPED_SOL_MINT : fromMint,
-      toMint.equals(SOL_MINT) ? WRAPPED_SOL_MINT : toMint
-    );
-    if (markets === null) {
-      return null;
-    }
-    const kind: RouteKind = "usdx";
-    return { markets, kind };
-  }, [fromMint, toMint, swapClient]);
-
-  if (asyncRoute.result) {
-    return asyncRoute.result;
-  }
-  return null;
-}
-
-type Slabs = {
-  bids: OrderbookSide;
-  asks: OrderbookSide;
-};
 
 // Wormhole utils.
 

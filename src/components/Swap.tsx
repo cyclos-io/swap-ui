@@ -32,8 +32,6 @@ import {
   useDexContext,
   useMarket,
   useOpenOrderAccounts,
-  useRoute,
-  useRouteVerbose,
 } from "../context/Dex";
 import {
   useCanCreateAccounts,
@@ -181,7 +179,7 @@ export default function SwapCard({
 export function SwapHeader() {
   const { fromMint, toMint } = useSwapContext();
   // Use last route item to find impact
-  const route = useRoute(fromMint, toMint);
+  const { route } = useDexContext();
   return (
     <div
       style={{
@@ -198,7 +196,7 @@ export function SwapHeader() {
       >
         SWAP
       </Typography>
-      <InfoButton route={route} />
+      <InfoButton route={route?.markets} />
     </div>
   );
 }
@@ -426,8 +424,8 @@ export function SwapButton({
   const { userTokens } = useTokenContext();
   const fromTokenInfo = useTokenInfo(fromMint);
   const toTokenInfo = useTokenInfo(toMint);
+  const { route } = useDexContext();
 
-  const route = useRouteVerbose(fromMint, toMint);
   const fromMarket = useMarket(
     route && route.markets ? route.markets[0] : undefined
   );

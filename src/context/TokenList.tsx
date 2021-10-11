@@ -103,7 +103,9 @@ export function TokenListContextProvider(props: Props) {
     // Owned tokens sorted by moneyary worth
     const ownedTokens = allTokens
       .filter((token) => {
-        return userTokens !== "fetching" && userTokens?.[token.address] !== undefined;
+        return (
+          userTokens !== "fetching" && userTokens?.[token.address] !== undefined
+        );
       })
       .sort((a: TokenInfo, b: TokenInfo) => {
         const tokenA = (userTokens as FetchedTokens)?.[a.address];

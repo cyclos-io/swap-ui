@@ -1,5 +1,5 @@
 import * as assert from "assert";
-import React, { useContext, useState, useEffect } from "react";
+import React, { useContext, useState, useEffect, ReactNode } from "react";
 import { useAsync } from "react-async-hook";
 import { PublicKey } from "@solana/web3.js";
 import {
@@ -17,18 +17,11 @@ import {
   SOLLET_USDT_MINT,
   SOLLET_USDC_MINT,
 } from "../utils/pubkeys";
-import {
-  useFairRoute,
-  useRouteVerbose,
-  useDexContext,
-  FEE_MULTIPLIER,
-  useBbo,
-} from "./Dex";
+import { useFairRoute, useDexContext, FEE_MULTIPLIER, useBbo } from "./Dex";
 import {
   useTokenListContext,
   SPL_REGISTRY_SOLLET_TAG,
   SPL_REGISTRY_WORM_TAG,
-  useTokenInfo,
 } from "./TokenList";
 import { useOwnedTokenAccount } from "../context/Token";
 
@@ -92,7 +85,16 @@ export type SwapContext = {
 };
 const _SwapContext = React.createContext<null | SwapContext>(null);
 
-export function SwapContextProvider(props: any) {
+type SwapContextProviderProps = {
+  fromMint?: PublicKey;
+  toMint?: PublicKey;
+  fromAmount?: number;
+  toAmount?: number;
+  referral?: PublicKey;
+  children: ReactNode;
+};
+export function SwapContextProvider(props: SwapContextProviderProps) {
+  const { updateRoute } = useDexContext();
   const [fromMint, setFromMint] = useState(props.fromMint ?? SRM_MINT);
   const [toMint, setToMint] = useState(props.toMint ?? USDC_MINT);
   const [fromAmount, _setFromAmount] = useState(props.fromAmount ?? 0);
@@ -108,6 +110,13 @@ export function SwapContextProvider(props: any) {
   const feeMultiplier = isWrapUnwrap ? 1 : FEE_MULTIPLIER;
 
   assert.ok(slippage >= 0);
+
+  // Update route state when new tokens are selected
+  useEffect(() => {
+    if (fromMint && toMint) {
+      updateRoute(fromMint, toMint);
+    }
+  }, [fromMint, toMint]);
 
   useEffect(() => {
     if (!fair) {
@@ -232,7 +241,7 @@ export function useCanCreateAccounts(): boolean {
   const { wormholeMap, solletMap } = useTokenListContext();
   const fromWallet = useOwnedTokenAccount(fromMint);
   const fair = useSwapFair();
-  const route = useRouteVerbose(fromMint, toMint);
+  const { route } = useDexContext();
 
   if (route === null) {
     return false;
@@ -250,7 +259,7 @@ export function useCanCreateAccounts(): boolean {
     // Wallet is connected.
     swapClient.program.provider.wallet.publicKey !== null &&
     // Trade route exists.
-    route !== null &&
+    route !== undefined &&
     // Wormhole <-> native markets must have the wormhole token as the
     // *from* address since they're one-sided markets.
     (route.kind !== "wormhole-native" ||
@@ -350,7 +359,7 @@ export function useCanSwap(): boolean {
   const { wormholeMap, solletMap } = useTokenListContext();
   const fromWallet = useOwnedTokenAccount(fromMint);
   const fair = useSwapFair();
-  const route = useRouteVerbose(fromMint, toMint);
+  const { route } = useDexContext();
 
   if (route === null) {
     return false;
@@ -371,7 +380,7 @@ export function useCanSwap(): boolean {
     fromAmount > 0 &&
     toAmount > 0 &&
     // Trade route exists.
-    route !== null &&
+    route !== undefined &&
     // Wormhole <-> native markets must have the wormhole token as the
     // *from* address since they're one-sided markets.
     (route.kind !== "wormhole-native" ||
