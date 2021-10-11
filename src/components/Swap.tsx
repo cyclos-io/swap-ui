@@ -76,7 +76,6 @@ import TokenDialog from "./TokenDialog";
 const useStyles = makeStyles((theme) => ({
   container: {
     width: theme.spacing(54),
-    margin: theme.spacing(0.5),
   },
   card: {
     borderRadius: theme.spacing(2),

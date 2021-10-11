@@ -59,7 +59,7 @@ export function InfoLabel() {
 
   // Use last route item to find impact
   const route = useRoute(fromMint, toMint);
-  const impact = usePriceImpact(route?.at(-1));
+  const impact = usePriceImpact(route?.[route?.length - 1]);
 
   return (
     <Box my={2}>
