@@ -48,7 +48,7 @@ export function InfoLabel() {
     showReversePrices,
     setShowReversePrices,
   } = useSwapContext();
-  const fair = useSwapFair(showReversePrices);
+  const fair = useSwapFair();
   const fromTokenInfo = useTokenInfo(fromMint);
   const toTokenInfo = useTokenInfo(toMint);
 
@@ -59,6 +59,7 @@ export function InfoLabel() {
   return (
     <Box my={2}>
       <div className={styles.infoLabel}>
+        {/* 1 unit of from token */}
         <Typography
           color="textSecondary"
           align="center"
@@ -70,6 +71,8 @@ export function InfoLabel() {
               : `1 ${toTokenInfo.symbol}`
             : `-`}
         </Typography>
+
+        {/* Reverse direction button */}
         <IconButton
           color={showReversePrices ? "primary" : "default"}
           className={styles.infoButton}
@@ -77,6 +80,8 @@ export function InfoLabel() {
         >
           <SwapHorizRounded />
         </IconButton>
+
+        {/* Calculated amount of to token */}
         <Typography
           color="textSecondary"
           align="center"
@@ -84,7 +89,9 @@ export function InfoLabel() {
         >
           {fair !== undefined && toTokenInfo && fromTokenInfo
             ? showReversePrices
-              ? `${fair.toFixed(toTokenInfo.decimals)} ${toTokenInfo.symbol}`
+              ? `${(1 / fair).toFixed(toTokenInfo.decimals)} ${
+                  toTokenInfo.symbol
+                }`
               : `${fair.toFixed(fromTokenInfo.decimals)} ${
                   fromTokenInfo.symbol
                 }`

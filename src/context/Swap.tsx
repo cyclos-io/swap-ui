@@ -99,6 +99,8 @@ export function SwapContextProvider(props: SwapContextProviderProps) {
   const [toMint, setToMint] = useState(props.toMint ?? USDC_MINT);
   const [fromAmount, _setFromAmount] = useState(props.fromAmount ?? 0);
   const [toAmount, _setToAmount] = useState(props.toAmount ?? 0);
+
+  // State stored in context, so it can be used to reverse chart direction
   const [showReversePrices, setShowReversePrices] = useState(false);
   const [isClosingNewAccounts, setIsClosingNewAccounts] = useState(false);
   const [isStrict, setIsStrict] = useState(false);
@@ -192,11 +194,9 @@ export function useSwapContext(): SwapContext {
   return ctx;
 }
 
-export function useSwapFair(reversed?: boolean): number | undefined {
+export function useSwapFair(): number | undefined {
   const { fairOverride, fromMint, toMint } = useSwapContext();
-  return reversed
-    ? _useSwapFair(toMint, fromMint, fairOverride)
-    : _useSwapFair(fromMint, toMint, fairOverride);
+  return _useSwapFair(fromMint, toMint, fairOverride);
 }
 
 function _useSwapFair(
