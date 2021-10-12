@@ -1,5 +1,4 @@
 import React, { useContext, useState, ReactNode, useEffect } from "react";
-import { useAsync } from "react-async-hook";
 import { TokenInfo } from "@solana/spl-token-registry";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { Swap as SwapClient } from "@project-serum/swap";
@@ -24,7 +23,6 @@ import { useTokenListContext, useTokenInfo } from "./TokenList";
 import { fetchSolletInfo, requestWormholeSwapMarketIfNeeded } from "./Sollet";
 import { useSwapContext, useIsWrapSol } from "./Swap";
 import { Actions, useInterval, useMap } from "usehooks-ts";
-import { useTokenContext } from "./Token";
 
 const BASE_TAKER_FEE_BPS = 0.0022;
 export const FEE_MULTIPLIER = 1 - BASE_TAKER_FEE_BPS;
@@ -36,7 +34,6 @@ export type Slabs = {
 };
 
 type DexContext = {
-  closeOpenOrders: (openOrder: OpenOrders) => void;
   addOpenOrderAccount: (market: PublicKey, accountData: OpenOrders) => void;
   swapClient: SwapClient;
   openOrders: Omit<Map<string, OpenOrders[]>, "set" | "clear" | "delete">;
@@ -60,11 +57,6 @@ export type Route = {
   kind: RouteKind;
 };
 
-type MarketData = {
-  market: Market;
-  openOrders: OpenOrders[];
-  slabs: Slabs;
-};
 export function DexContextProvider(props: DexContextProviderProps) {
   const { wormholeMap, solletMap } = useTokenListContext();
   const [route, setRoute] = useState<Route>();
@@ -77,23 +69,6 @@ export function DexContextProvider(props: DexContextProviderProps) {
 
   const swapClient = props.swapClient;
   const provider = swapClient.program.provider;
-
-  // Removes the given open orders from the context.
-  const closeOpenOrders = async (openOrder: OpenOrders) => {
-    // TODO remove function
-    // const openOrderMarket = openOrder.market.toString()
-    // const newOoAccounts = new Map(openOrders);
-    // // Filter out, otherwise delete
-    // const filteredOpenOrders = newOoAccounts
-    //   .get(openOrderMarket)
-    //   ?.filter((oo: OpenOrders) => !oo.address.equals(openOrder.address));
-    // if (filteredOpenOrders && filteredOpenOrders.length > 0) {
-    //   newOoAccounts.set(openOrderMarket, filteredOpenOrders);
-    // } else {
-    //   newOoAccounts.delete(openOrderMarket);
-    // }
-    // setOpenOrders(newOoAccounts);
-  };
 
   // Fetch market data route changes
   useEffect(() => {
@@ -231,7 +206,6 @@ export function DexContextProvider(props: DexContextProviderProps) {
   return (
     <_DexContext.Provider
       value={{
-        closeOpenOrders,
         addOpenOrderAccount,
         swapClient,
         openOrders,

@@ -15,7 +15,6 @@ import PopupState, { bindPopover, bindTrigger } from "material-ui-popup-state";
 import { useState } from "react";
 import { useDexContext } from "../context/Dex";
 import { useSwapContext, useSwapFair } from "../context/Swap";
-import OpenOrdersDialog from "./OpenOrdersDialog";
 
 const useStyles = makeStyles((theme) => ({
   tab: {
@@ -97,7 +96,6 @@ function SettingsDetails() {
 
   const { slippage, setSlippage, fairOverride, setFairOverride } =
     useSwapContext();
-  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const fair = useSwapFair();
   const { swapClient } = useDexContext();
 
@@ -174,19 +172,7 @@ function SettingsDetails() {
         <div style={{ margin: "10px 0px" }}>
           <CloseNewAccountsSwitch />
         </div>
-        <Button
-          variant="contained"
-          fullWidth
-          disabled={swapClient.program.provider.wallet.publicKey === null}
-          onClick={() => setShowSettingsDialog(true)}
-        >
-          Manage Dex Accounts
-        </Button>
       </div>
-      <OpenOrdersDialog
-        open={showSettingsDialog}
-        onClose={() => setShowSettingsDialog(false)}
-      />
     </div>
   );
 }
