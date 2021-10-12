@@ -418,17 +418,11 @@ export function SwapButton({
   const toTokenInfo = useTokenInfo(toMint);
   const { route } = useDexContext();
 
-  const fromMarket = useMarket(
-    route && route.markets ? route.markets[0] : undefined
-  );
-
+  const fromMarket = useMarket(route?.markets?.[0]);
   // Second market in case of multi-market swap
-  const toMarket = useMarket(
-    route && route.markets ? route.markets[1] : undefined
-  );
+  const toMarket = useMarket(route?.markets?.[1]);
 
   const toWallet = useOwnedTokenAccount(toMint);
-  console.log("To wallet", toWallet);
   const fromWallet = useOwnedTokenAccount(fromMint);
 
   // Intermediary token for multi-market swaps, eg. USDC in a SRM -> BTC swap
@@ -446,9 +440,8 @@ export function SwapButton({
   const { isWrapSol, isUnwrapSol } = useIsWrapSol(fromMint, toMint);
   const isUnwrapSollet = useIsUnwrapSollet(fromMint, toMint);
 
-  const { result: fromOo, loading: fromOoLoading } =
-    useOpenOrderAccounts(fromMarket);
-  const { result: toOo, loading: toOoLoading } = useOpenOrderAccounts(toMarket);
+  const fromOo = useOpenOrderAccounts(route?.markets?.[0]);
+  const toOo = useOpenOrderAccounts(route?.markets?.[1]);
 
   const disconnected = !swapClient.program.provider.wallet.publicKey;
 
@@ -457,15 +450,10 @@ export function SwapButton({
 
   const needsCreateAccounts =
     !toWallet || (!isUnwrapSollet && (!fromOo || (toMarket && !toOo)));
-  console.log("From openOrders", fromOo);
-  console.log("Need create accounts", !fromOo || (toMarket && !toOo));
 
   const fromTokenDecimals = fromTokenInfo?.decimals;
   const toTokenDecimals = toTokenInfo?.decimals;
   const quoteTokenDecimals = quoteTokenInfo?.decimals;
-
-  // Fetch openOrder accounts when route changes
-  useEffect(() => {}, [route]);
 
   // Click handlers.
 
@@ -853,7 +841,7 @@ export function SwapButton({
       </Button>
     );
   }
-  if (!userTokens || fromOoLoading || toOoLoading) {
+  if (!userTokens || !fromOo || (toMarket && !toOo)) {
     return (
       <Button
         variant="contained"

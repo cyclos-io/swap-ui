@@ -41,8 +41,8 @@ type DexContext = {
   swapClient: SwapClient;
   openOrders: Omit<Map<string, OpenOrders[]>, "set" | "clear" | "delete">;
   openOrdersActions: Actions<string, OpenOrders[]>;
-  markets: Omit<Map<string, Market | Fetching>, "set" | "clear" | "delete">;
-  marketsActions: Actions<string, Market | Fetching>;
+  markets: Omit<Map<string, Market>, "set" | "clear" | "delete">;
+  marketsActions: Actions<string, Market>;
   slabMap: Omit<Map<string, Slabs>, "set" | "clear" | "delete">;
   slabMapActions: Actions<string, Slabs>;
   route: Route | undefined;
@@ -60,16 +60,20 @@ export type Route = {
   kind: RouteKind;
 };
 
+type MarketData = {
+  market: Market;
+  openOrders: OpenOrders[];
+  slabs: Slabs;
+};
 export function DexContextProvider(props: DexContextProviderProps) {
   const { wormholeMap, solletMap } = useTokenListContext();
+  const [route, setRoute] = useState<Route>();
+
   const [openOrders, openOrdersActions] = useMap<string, Array<OpenOrders>>(
     new Map()
   );
-  const [markets, marketsActions] = useMap<string, Market | Fetching>(
-    new Map()
-  );
+  const [markets, marketsActions] = useMap<string, Market>(new Map());
   const [slabMap, slabMapActions] = useMap<string, Slabs>(new Map());
-  const [route, setRoute] = useState<Route>();
 
   const swapClient = props.swapClient;
   const provider = swapClient.program.provider;
@@ -91,24 +95,65 @@ export function DexContextProvider(props: DexContextProviderProps) {
     // setOpenOrders(newOoAccounts);
   };
 
-  // Fetch market and openOrder accounts when route changes
-  // useEffect(() => {
-
-  //   if (!route) {
-  //     return
-  //   }
-  //   route.markets.forEach(market => {
-  //     const marketKey = market.toString()
-  //     const savedMarket = markets.get(marketKey)
-  //   })
-  // }, [route])
-
+  // Fetch market data route changes
   useEffect(() => {
-    console.log("OpenOrder state updated", openOrders);
-  }, [openOrders, provider]);
+    async function setMarketsForRoute() {
+      if (!route) {
+        return;
+      }
+      for (const market of route?.markets) {
+        const marketKey = market.toString();
+        const savedMarket = markets.get(marketKey);
+        if (!savedMarket) {
+          const fetchedMarket = await Market.load(
+            provider.connection,
+            market,
+            provider.opts,
+            DEX_PID
+          );
+          marketsActions.set(marketKey, fetchedMarket);
+        }
+      }
+    }
+    setMarketsForRoute();
+  }, [route]);
+
+  // Update OpenOrders when route or wallet changes
+  const walletKey = provider.wallet.publicKey;
+  useEffect(() => {
+    async function setOpenOrdersForRoute() {
+      if (!route) {
+        return;
+      }
+      if (!walletKey) {
+        if (openOrders?.size !== 0) {
+          openOrdersActions.reset();
+        }
+        return;
+      }
+      for (const market of route?.markets) {
+        const marketKey = market.toString();
+        const savedOo = openOrders.get(marketKey);
+        if (!savedOo) {
+          const savedMarket = markets.get(marketKey);
+          // exit if market client is not saved
+          if (!savedMarket) {
+            return;
+          }
+          const fetchedOpenOrders =
+            await savedMarket.findOpenOrdersAccountsForOwner(
+              provider.connection,
+              walletKey
+            );
+
+          openOrdersActions.set(marketKey, fetchedOpenOrders);
+        }
+      }
+    }
+    setOpenOrdersForRoute();
+  }, [route, markets, walletKey]);
 
   const addOpenOrderAccount = (market: PublicKey, accountData: OpenOrders) => {
-    // const { openOrders, openOrdersActions } = useDexContext()
     console.log("setting openorder");
     openOrdersActions.set(market.toString(), [accountData]);
   };
@@ -150,16 +195,16 @@ export function DexContextProvider(props: DexContextProviderProps) {
     }
   };
 
+  // Poll for bid and ask slabs to display current price of token
   useInterval(
     async () => {
       if (!route) {
         return;
       }
-      // console.log("polling for route", route);
       route.markets.forEach(async (market) => {
         const marketKey = market.toString();
         const marketClient = markets.get(marketKey);
-        if (!marketClient || marketClient === "fetching") {
+        if (!marketClient) {
           return;
         }
         const bids = await marketClient.loadBids(provider.connection);
@@ -202,71 +247,19 @@ export function useDexContext(): DexContext {
 /**
  * Return all OpenOrder accounts of a user for a given market
  */
-export function useOpenOrderAccounts(market?: Market) {
-  const { provider } = useTokenContext();
-  const { openOrders, openOrdersActions } = useDexContext();
-
-  return useAsync(async () => {
-    if (!market) {
-      return undefined;
-    }
-    const marketKey = market.address.toString();
-    const savedOpenOrders = openOrders.get(marketKey);
-    if (savedOpenOrders) {
-      return savedOpenOrders;
-    }
-    // Fetch if not saved in cache
-
-    const fetchedOpenOrders = await market.findOpenOrdersAccountsForOwner(
-      provider.connection,
-      provider.wallet.publicKey
-    );
-    console.log("Got openorders", fetchedOpenOrders);
-    // Triggers rerender, where saved value will be returned
-    openOrdersActions.set(marketKey, fetchedOpenOrders);
-    return fetchedOpenOrders;
-  }, [market]);
+export function useOpenOrderAccounts(market?: PublicKey) {
+  const { openOrders } = useDexContext();
+  return market ? openOrders.get(market.toString()) : undefined;
 }
 
 /**
- * Custom hook to get Market object for given public key
+ * Get saved Market client for given market public key
  * @param market public key
  * @returns Market | undefined
  */
-export function useMarket(
-  market?: PublicKey,
-  caller?: string
-): Market | undefined {
-  const { provider } = useTokenContext();
-  const { markets, marketsActions } = useDexContext();
-
-  const asyncMarket = useAsync(async () => {
-    if (!market) {
-      return undefined;
-    }
-    const marketKey = market.toString();
-    const savedMarket = markets.get(marketKey);
-    if (savedMarket === "fetching") {
-      console.log("Market fetch in progress");
-      return undefined;
-    } else if (savedMarket) {
-      // console.log("Found saved market");
-      return savedMarket;
-    }
-
-    console.log("Fetching market");
-    marketsActions.set(marketKey, "fetching");
-    const fetchedMarket = await Market.load(
-      provider.connection,
-      market,
-      provider.opts,
-      DEX_PID
-    );
-    marketsActions.set(marketKey, fetchedMarket);
-    return fetchedMarket;
-  }, [market]);
-
-  return asyncMarket.result;
+export function useMarket(market?: PublicKey): Market | undefined {
+  const { markets } = useDexContext();
+  return market ? markets.get(market.toString()) : undefined;
 }
 
 /**
@@ -277,8 +270,7 @@ export function useMarket(
  */
 export function useMarketSlabs(market?: PublicKey): Slabs | undefined {
   const { slabMap } = useDexContext();
-  const marketKey = market?.toString();
-  return marketKey ? slabMap.get(marketKey) : undefined;
+  return market ? slabMap.get(market?.toString()) : undefined;
 }
 
 export function useMarketName(market: PublicKey): string | null {
