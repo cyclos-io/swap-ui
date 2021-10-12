@@ -1,4 +1,4 @@
-import React, { useContext, useState, ReactNode } from "react";
+import React, { useContext, useState, ReactNode, useEffect } from "react";
 import { useAsync } from "react-async-hook";
 import { TokenInfo } from "@solana/spl-token-registry";
 import { Connection, PublicKey } from "@solana/web3.js";
@@ -91,14 +91,26 @@ export function DexContextProvider(props: DexContextProviderProps) {
     // setOpenOrders(newOoAccounts);
   };
 
-  const addOpenOrderAccount = async (
-    market: PublicKey,
-    accountData: OpenOrders
-  ) => {
-    // const newOoAccounts = new Map(openOrders);
-    // newOoAccounts.set(market.toString(), [accountData]);
-    // setOpenOrders(newOoAccounts);
-    // setIsLoaded(true);
+  // Fetch market and openOrder accounts when route changes
+  // useEffect(() => {
+
+  //   if (!route) {
+  //     return
+  //   }
+  //   route.markets.forEach(market => {
+  //     const marketKey = market.toString()
+  //     const savedMarket = markets.get(marketKey)
+  //   })
+  // }, [route])
+
+  useEffect(() => {
+    console.log("OpenOrder state updated", openOrders);
+  }, [openOrders, provider]);
+
+  const addOpenOrderAccount = (market: PublicKey, accountData: OpenOrders) => {
+    // const { openOrders, openOrdersActions } = useDexContext()
+    console.log("setting openorder");
+    openOrdersActions.set(market.toString(), [accountData]);
   };
 
   // Types of routes.
@@ -125,7 +137,7 @@ export function DexContextProvider(props: DexContextProviderProps) {
         fromMint.equals(SOL_MINT) ? WRAPPED_SOL_MINT : fromMint,
         toMint.equals(SOL_MINT) ? WRAPPED_SOL_MINT : toMint
       );
-      console.log("Got route markets", markets);
+      // console.log("Got route markets", markets);
 
       if (markets) {
         console.log("Route set");
@@ -143,7 +155,7 @@ export function DexContextProvider(props: DexContextProviderProps) {
       if (!route) {
         return;
       }
-      console.log("polling for route", route);
+      // console.log("polling for route", route);
       route.markets.forEach(async (market) => {
         const marketKey = market.toString();
         const marketClient = markets.get(marketKey);
@@ -204,10 +216,12 @@ export function useOpenOrderAccounts(market?: Market) {
       return savedOpenOrders;
     }
     // Fetch if not saved in cache
+
     const fetchedOpenOrders = await market.findOpenOrdersAccountsForOwner(
       provider.connection,
       provider.wallet.publicKey
     );
+    console.log("Got openorders", fetchedOpenOrders);
     // Triggers rerender, where saved value will be returned
     openOrdersActions.set(marketKey, fetchedOpenOrders);
     return fetchedOpenOrders;
@@ -236,7 +250,7 @@ export function useMarket(
       console.log("Market fetch in progress");
       return undefined;
     } else if (savedMarket) {
-      console.log("Found saved market");
+      // console.log("Found saved market");
       return savedMarket;
     }
 

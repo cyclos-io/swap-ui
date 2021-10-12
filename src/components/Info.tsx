@@ -131,7 +131,7 @@ export function InfoLabel() {
   );
 }
 
-export function InfoButton({ route }: { route?: PublicKey[] }) {
+export function InfoButton() {
   const styles = useStyles();
   const theme = useTheme();
   return (
@@ -162,7 +162,7 @@ export function InfoButton({ route }: { route?: PublicKey[] }) {
               PaperProps={{ style: { borderRadius: "10px" } }}
               disableRestoreFocus
             >
-              <InfoDetails route={route} />
+              <InfoDetails />
             </Popover>
           </div>
         )
@@ -171,7 +171,11 @@ export function InfoButton({ route }: { route?: PublicKey[] }) {
   );
 }
 
-function InfoDetails({ route }: { route?: PublicKey[] }) {
+function InfoDetails() {
+  // Use last route item to find impact
+  const { route } = useDexContext();
+  const routeMarkets = route?.markets;
+
   const { fromMint, toMint } = useSwapContext();
   const fromTokenInfo = useTokenInfo(fromMint);
   const toTokenInfo = useTokenInfo(toMint);
@@ -190,8 +194,8 @@ function InfoDetails({ route }: { route?: PublicKey[] }) {
         >
           Trade Route
         </Typography>
-        {route ? (
-          route.map((market: PublicKey) => {
+        {routeMarkets ? (
+          routeMarkets.map((market: PublicKey) => {
             return <MarketRoute key={market.toString()} market={market} />;
           })
         ) : (

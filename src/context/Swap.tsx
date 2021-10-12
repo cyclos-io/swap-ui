@@ -113,6 +113,7 @@ export function SwapContextProvider(props: SwapContextProviderProps) {
 
   assert.ok(slippage >= 0);
 
+  // TODO move in component
   // Update route state when new tokens are selected
   useEffect(() => {
     if (fromMint && toMint) {

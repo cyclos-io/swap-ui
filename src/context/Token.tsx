@@ -35,10 +35,9 @@ export function TokenContextProvider({
   let pollDuration = poll ? 10000 : null;
 
   if (poll && !userTokens && userTokens !== "fetching") {
-    pollDuration = 1000;
+    pollDuration = 0;
   }
   useInterval(async () => {
-    console.log("Polling for tokens");
     try {
       if (!userTokens) {
         setUserTokens("fetching");

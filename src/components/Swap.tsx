@@ -26,7 +26,7 @@ import {
   Transaction,
   TransactionInstruction,
 } from "@solana/web3.js";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   FEE_MULTIPLIER,
   useDexContext,
@@ -177,9 +177,6 @@ export default function SwapCard({
 }
 
 export function SwapHeader() {
-  const { fromMint, toMint } = useSwapContext();
-  // Use last route item to find impact
-  const { route } = useDexContext();
   return (
     <div
       style={{
@@ -196,7 +193,7 @@ export function SwapHeader() {
       >
         SWAP
       </Typography>
-      <InfoButton route={route?.markets} />
+      <InfoButton />
     </div>
   );
 }
@@ -415,12 +412,7 @@ export function SwapButton({
     isClosingNewAccounts,
     isStrict,
   } = useSwapContext();
-  const {
-    swapClient,
-    // isLoaded: isDexLoaded,
-    addOpenOrderAccount,
-    // openOrders,
-  } = useDexContext();
+  const { swapClient, addOpenOrderAccount } = useDexContext();
   const { userTokens } = useTokenContext();
   const fromTokenInfo = useTokenInfo(fromMint);
   const toTokenInfo = useTokenInfo(toMint);
@@ -436,6 +428,7 @@ export function SwapButton({
   );
 
   const toWallet = useOwnedTokenAccount(toMint);
+  console.log("To wallet", toWallet);
   const fromWallet = useOwnedTokenAccount(fromMint);
 
   // Intermediary token for multi-market swaps, eg. USDC in a SRM -> BTC swap
@@ -453,18 +446,9 @@ export function SwapButton({
   const { isWrapSol, isUnwrapSol } = useIsWrapSol(fromMint, toMint);
   const isUnwrapSollet = useIsUnwrapSollet(fromMint, toMint);
 
-  const fromOpenOrdersReq = useOpenOrderAccounts(fromMarket);
-  const toOpenOrdersReq = useOpenOrderAccounts(fromMarket);
-
-  // const fromOpenOrders = useMemo(() => {
-  //   return fromMarket
-  //     ? openOrders.get(fromMarket?.address.toString())
-  //     : undefined;
-  // }, [fromMarket, openOrders]);
-
-  // const toOpenOrders = useMemo(() => {
-  //   return toMarket ? openOrders.get(toMarket?.address.toString()) : undefined;
-  // }, [toMarket, openOrders]);
+  const { result: fromOo, loading: fromOoLoading } =
+    useOpenOrderAccounts(fromMarket);
+  const { result: toOo, loading: toOoLoading } = useOpenOrderAccounts(toMarket);
 
   const disconnected = !swapClient.program.provider.wallet.publicKey;
 
@@ -472,12 +456,16 @@ export function SwapButton({
     fromAmount == 0 || fromAmount > (fromWallet?.tokenAmount ?? 0);
 
   const needsCreateAccounts =
-    !toWallet ||
-    (!isUnwrapSollet && (!fromOpenOrdersReq || (toMarket && !toOpenOrdersReq)));
+    !toWallet || (!isUnwrapSollet && (!fromOo || (toMarket && !toOo)));
+  console.log("From openOrders", fromOo);
+  console.log("Need create accounts", !fromOo || (toMarket && !toOo));
 
   const fromTokenDecimals = fromTokenInfo?.decimals;
   const toTokenDecimals = toTokenInfo?.decimals;
   const quoteTokenDecimals = quoteTokenInfo?.decimals;
+
+  // Fetch openOrder accounts when route changes
+  useEffect(() => {}, [route]);
 
   // Click handlers.
 
@@ -558,24 +546,24 @@ export function SwapButton({
      * TODO: generate object client side to save a network call
      * @param openOrdersAddress
      */
-    async function saveOpenOrders(openOrdersAddress: PublicKey) {
-      const generatedOpenOrders = await OpenOrders.load(
-        swapClient.program.provider.connection,
-        openOrdersAddress,
-        DEX_PID
-      );
-      addOpenOrderAccount(generatedOpenOrders.market, generatedOpenOrders);
+    async function saveOpenOrders(
+      openOrdersAddress: PublicKey,
+      market: PublicKey
+    ) {
+      // Client side generated to save network request
+      const createdOo = new OpenOrders(openOrdersAddress, undefined, DEX_PID);
+      addOpenOrderAccount(market, createdOo);
     }
 
     // Open order accounts for to / from wallets. Generate if not already present
     let ooFrom!: Keypair;
     let ooTo!: Keypair;
-    if (fromMarket && !fromOpenOrdersReq) {
+    if (fromMarket && (!fromOo || fromOo?.length === 0)) {
       ooFrom = Keypair.generate();
       await getInitOpenOrdersIx(ooFrom, fromMarket.address, tx);
       signers.push(ooFrom);
     }
-    if (toMarket && !toOpenOrdersReq) {
+    if (toMarket && (!OpenOrders || fromOo?.length === 0)) {
       ooTo = Keypair.generate();
       await getInitOpenOrdersIx(ooTo, toMarket.address, tx);
       signers.push(ooTo);
@@ -584,13 +572,12 @@ export function SwapButton({
     try {
       // Send transaction to create accounts
       await swapClient.program.provider.send(tx, signers);
-
       // Save OpenOrders to cache
-      if (ooFrom) {
-        await saveOpenOrders(ooFrom.publicKey);
+      if (ooFrom && fromMarket) {
+        await saveOpenOrders(ooFrom.publicKey, fromMarket.address);
       }
-      if (ooTo) {
-        await saveOpenOrders(ooTo.publicKey);
+      if (ooTo && toMarket) {
+        await saveOpenOrders(ooTo.publicKey, toMarket.address);
       }
 
       // No need to save created token accounts, they will be fetched on polling
@@ -815,8 +802,8 @@ export function SwapButton({
         referral,
         fromMarket,
         toMarket,
-        fromOpenOrders: fromOpenOrdersReq?.result?.[0]?.address,
-        toOpenOrders: toOpenOrdersReq?.result?.[0]?.address,
+        fromOpenOrders: fromOo?.[0]?.address,
+        toOpenOrders: toOo?.[0]?.address,
         fromWallet: fromWalletAddr,
         toWallet: toWalletAddr,
         quoteWallet: quoteWallet
@@ -866,7 +853,7 @@ export function SwapButton({
       </Button>
     );
   }
-  if (!userTokens || fromOpenOrdersReq.loading || toOpenOrdersReq.loading) {
+  if (!userTokens || fromOoLoading || toOoLoading) {
     return (
       <Button
         variant="contained"
