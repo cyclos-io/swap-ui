@@ -26,7 +26,6 @@ import { Actions, useInterval, useMap } from "usehooks-ts";
 
 const BASE_TAKER_FEE_BPS = 0.0022;
 export const FEE_MULTIPLIER = 1 - BASE_TAKER_FEE_BPS;
-type Fetching = "fetching";
 
 export type Slabs = {
   bids: OrderbookSide;

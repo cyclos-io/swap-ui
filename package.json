@@ -9,7 +9,6 @@
     "@project-serum/serum": "^0.13.58",
     "@project-serum/swap": "^0.1.0-alpha.32",
     "@solana/spl-token": "^0.1.8",
-    "@use-it/interval": "^1.0.0",
     "usehooks-ts": "^1.0.4"
   },
   "peerDependencies": {
