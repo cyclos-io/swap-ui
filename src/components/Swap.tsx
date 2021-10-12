@@ -775,12 +775,6 @@ export function SwapButton({
         ? new PublicKey(toWallet.tokenAccount)
         : undefined;
 
-      // const fromOpenOrdersList = openOrders.get(fromMarket?.address.toString());
-      // let fromOpenOrders: PublicKey | undefined = undefined;
-      // if (fromOpenOrdersList) {
-      //   fromOpenOrders = fromOpenOrdersList[0].address;
-      // }
-
       return await swapClient.swapTxs({
         fromMint,
         toMint,

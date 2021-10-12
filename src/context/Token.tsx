@@ -37,6 +37,7 @@ export function TokenContextProvider({
   if (poll && !userTokens && userTokens !== "fetching") {
     pollDuration = 0;
   }
+  // Poll for user tokens from Solscan
   useInterval(async () => {
     try {
       if (!userTokens) {

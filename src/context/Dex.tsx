@@ -105,13 +105,18 @@ export function DexContextProvider(props: DexContextProviderProps) {
         const marketKey = market.toString();
         const savedMarket = markets.get(marketKey);
         if (!savedMarket) {
-          const fetchedMarket = await Market.load(
-            provider.connection,
-            market,
-            provider.opts,
-            DEX_PID
-          );
-          marketsActions.set(marketKey, fetchedMarket);
+          try {
+            const fetchedMarket = await Market.load(
+              provider.connection,
+              market,
+              provider.opts,
+              DEX_PID
+            );
+            marketsActions.set(marketKey, fetchedMarket);
+          } catch(error) {
+            console.log('Failed to fetch market', error)
+          }
+
         }
       }
     }
@@ -140,13 +145,19 @@ export function DexContextProvider(props: DexContextProviderProps) {
           if (!savedMarket) {
             return;
           }
-          const fetchedOpenOrders =
+
+          try {
+            const fetchedOpenOrders =
             await savedMarket.findOpenOrdersAccountsForOwner(
               provider.connection,
               walletKey
             );
 
           openOrdersActions.set(marketKey, fetchedOpenOrders);
+          } catch(error) {
+            console.error('Failed to get open order accounts', error)
+          }
+
         }
       }
     }
@@ -154,7 +165,6 @@ export function DexContextProvider(props: DexContextProviderProps) {
   }, [route, markets, walletKey]);
 
   const addOpenOrderAccount = (market: PublicKey, accountData: OpenOrders) => {
-    console.log("setting openorder");
     openOrdersActions.set(market.toString(), [accountData]);
   };
 
@@ -185,11 +195,9 @@ export function DexContextProvider(props: DexContextProviderProps) {
       // console.log("Got route markets", markets);
 
       if (markets) {
-        console.log("Route set");
         const kind: RouteKind = "usdx";
         setRoute({ markets, kind });
       } else {
-        console.log("Route unset");
         setRoute(undefined);
       }
     }
@@ -207,9 +215,14 @@ export function DexContextProvider(props: DexContextProviderProps) {
         if (!marketClient) {
           return;
         }
-        const bids = await marketClient.loadBids(provider.connection);
-        const asks = await marketClient.loadAsks(provider.connection);
-        slabMapActions.set(marketKey, { bids, asks });
+        try {
+          const bids = await marketClient.loadBids(provider.connection);
+          const asks = await marketClient.loadAsks(provider.connection);
+          slabMapActions.set(marketKey, { bids, asks });
+        } catch(error) {
+          console.error('Failed to poll for slabs', error)
+        }
+
       });
     },
     route ? 10000 : null
