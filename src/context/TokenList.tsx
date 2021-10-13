@@ -70,6 +70,7 @@ export function TokenListContextProvider(props: Props) {
     const list = props.tokenList
       .filterByClusterSlug("mainnet-beta")
       .getList()
+      .filter((token) => token.decimals > 0)
       .map((t: TokenInfo) => {
         if (t.address === WRAPPED_SOL_MINT.toString()) {
           // @ts-ignore

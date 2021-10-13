@@ -87,10 +87,9 @@ export function DexContextProvider(props: DexContextProviderProps) {
               DEX_PID
             );
             marketsActions.set(marketKey, fetchedMarket);
-          } catch(error) {
-            console.log('Failed to fetch market', error)
+          } catch (error) {
+            console.log("Failed to fetch market", error);
           }
-
         }
       }
     }
@@ -122,16 +121,15 @@ export function DexContextProvider(props: DexContextProviderProps) {
 
           try {
             const fetchedOpenOrders =
-            await savedMarket.findOpenOrdersAccountsForOwner(
-              provider.connection,
-              walletKey
-            );
+              await savedMarket.findOpenOrdersAccountsForOwner(
+                provider.connection,
+                walletKey
+              );
 
-          openOrdersActions.set(marketKey, fetchedOpenOrders);
-          } catch(error) {
-            console.error('Failed to get open order accounts', error)
+            openOrdersActions.set(marketKey, fetchedOpenOrders);
+          } catch (error) {
+            console.error("Failed to get open order accounts", error);
           }
-
         }
       }
     }
@@ -193,10 +191,9 @@ export function DexContextProvider(props: DexContextProviderProps) {
           const bids = await marketClient.loadBids(provider.connection);
           const asks = await marketClient.loadAsks(provider.connection);
           slabMapActions.set(marketKey, { bids, asks });
-        } catch(error) {
-          console.error('Failed to poll for slabs', error)
+        } catch (error) {
+          console.error("Failed to poll for slabs", error);
         }
-
       });
     },
     route ? 10000 : null

@@ -462,10 +462,11 @@ export function SwapButton({
    * for the swap, then send a create transaction
    */
   const sendCreateAccountsTransaction = async () => {
-    if (!fromTokenDecimals || !toTokenDecimals) {
+    // Check if null or undefined (== coercion), but not 0
+    if (fromTokenDecimals == null || toTokenDecimals == null) {
       throw new Error("Unable to calculate mint decimals");
     }
-    if (!quoteMint || !quoteTokenDecimals) {
+    if (!quoteMint || quoteTokenDecimals == null) {
       throw new Error("Quote mint not found");
     }
     const tx = new Transaction();
