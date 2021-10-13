@@ -336,6 +336,7 @@ function CommonBases({
         const mint = new PublicKey(tokenInfo.address);
         return (
           <Box
+            key={tokenInfo.address}
             onMouseEnter={() => {
               setHovered(tokenInfo?.symbol);
             }}
