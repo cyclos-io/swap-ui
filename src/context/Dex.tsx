@@ -259,7 +259,7 @@ export function useMarketSlabs(market?: PublicKey): Slabs | undefined {
 export function useMarketName(market: PublicKey): string | null {
   const marketClient = useMarket(market);
   const baseTokenInfo = useTokenInfo(marketClient?.baseMintAddress);
-  const quoteTokenInfo = useTokenInfo(marketClient?.baseMintAddress);
+  const quoteTokenInfo = useTokenInfo(marketClient?.quoteMintAddress);
 
   if (!marketClient) {
     return null;

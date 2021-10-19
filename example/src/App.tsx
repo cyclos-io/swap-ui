@@ -58,7 +58,7 @@ function AppInner() {
       preflightCommitment: "recent",
       commitment: "recent",
     };
-    const network = "https://solana-api.projectserum.com";
+    const network = "https://dawn-red-log.solana-mainnet.quiknode.pro/ff88020a7deb8e7d855ad7c5125f489ef1e9db71/";
     const wallet = new Wallet("https://www.sollet.io", network);
     const connection = new Connection(network, opts.preflightCommitment);
     const provider = new NotifyingProvider(

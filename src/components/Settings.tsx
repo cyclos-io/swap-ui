@@ -77,8 +77,9 @@ export function SettingsButton() {
               }}
               PaperProps={{
                 style: {
-                  borderRadius: "10px",
-                  boxShadow: "0px 0px 30px 5px rgba(0,0,0,0.075)",
+                  borderRadius: "0.5rem",
+                  boxShadow: "rgba(0, 0, 0, 0.1) 1px 3px 5px",
+                  marginTop: "-0.5rem",
                 },
               }}
             >

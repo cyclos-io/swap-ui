@@ -54,7 +54,7 @@ export function InfoLabel() {
 
   // Use last route item to find impact
   const { route } = useDexContext();
-  const impact = usePriceImpact(route?.markets?.at(-1));
+  const impact = usePriceImpact(route?.markets?.[route?.markets?.length - 1]);
 
   return (
     <Box my={2}>
