@@ -1,7 +1,9 @@
 import {
+  AppBar,
   Avatar,
   Badge,
   Box,
+  Button,
   Chip,
   Dialog,
   DialogActions,
@@ -24,7 +26,7 @@ import { TransitionProps } from "@material-ui/core/transitions";
 import { CloseRounded, Star, StarOutline } from "@material-ui/icons";
 import { TokenInfo } from "@solana/spl-token-registry";
 import { PublicKey } from "@solana/web3.js";
-import { forwardRef, useState } from "react";
+import { forwardRef, useEffect, useState } from "react";
 import { useOwnedTokenAccount, useTokenContext } from "../context/Token";
 import {
   useSwappableTokens,
@@ -41,7 +43,7 @@ const useStyles = makeStyles((theme) => ({
     marginBottom: "8px",
   },
   tab: {
-    minWidth: "134px",
+    minWidth: "80px",
   },
   tabSelected: {
     color: theme.palette.primary.contrastText,
@@ -98,13 +100,14 @@ export default function TokenDialog({
   const { swappableTokens, swappableTokensSollet, swappableTokensWormhole } =
     useSwappableTokens();
   const { tokenBase, addNewBase, tokenBaseMap, removeBase } = useTokenBase();
-  const displayTabs = !useMediaQuery("(max-width:450px)");
+
   const selectedTokens =
     tabSelection === 0
       ? swappableTokens
       : tabSelection === 1
       ? swappableTokensWormhole
       : swappableTokensSollet;
+
   let tokens =
     tokenFilter === ""
       ? selectedTokens
@@ -120,6 +123,7 @@ export default function TokenDialog({
       onClose={onClose}
       scroll={"paper"}
       TransitionComponent={Transition}
+      fullWidth
       PaperProps={{
         style: {
           borderRadius: "10px",
@@ -143,7 +147,7 @@ export default function TokenDialog({
         {/* Token search */}
         <TextField
           className={styles.textField}
-          autoFocus
+          autoFocus={!/Android|webOS|iPhone|iPad/i.test(navigator.userAgent)}
           placeholder={"Search name"}
           value={tokenFilter}
           size="small"
@@ -188,36 +192,37 @@ export default function TokenDialog({
           ))}
         </List>
       </DialogContent>
-      {displayTabs && (
-        <DialogActions>
-          <Tabs
-            value={tabSelection}
-            onChange={(e, v) => setTabSelection(v)}
-            classes={{
-              indicator: styles.tabIndicator,
-            }}
+      <DialogActions style={{ justifyContent: "center" }}>
+        <Box width="100%" display="flex" justifyContent="space-around">
+          <Button
+            fullWidth
+            disableRipple
+            variant={tabSelection === 0 ? "contained" : "text"}
+            color="primary"
+            onClick={() => setTabSelection(0)}
           >
-            <Tab
-              value={0}
-              className={styles.tab}
-              classes={{ selected: styles.tabSelected }}
-              label="Main"
-            />
-            <Tab
-              value={1}
-              className={styles.tab}
-              classes={{ selected: styles.tabSelected }}
-              label="Wormhole"
-            />
-            <Tab
-              value={2}
-              className={styles.tab}
-              classes={{ selected: styles.tabSelected }}
-              label="Sollet"
-            />
-          </Tabs>
-        </DialogActions>
-      )}
+            Main
+          </Button>
+          <Button
+            fullWidth
+            disableRipple
+            variant={tabSelection === 1 ? "contained" : "text"}
+            color="primary"
+            onClick={() => setTabSelection(1)}
+          >
+            Wormhole
+          </Button>
+          <Button
+            fullWidth
+            disableRipple
+            variant={tabSelection === 2 ? "contained" : "text"}
+            color="primary"
+            onClick={() => setTabSelection(2)}
+          >
+            Sollet
+          </Button>
+        </Box>
+      </DialogActions>
     </Dialog>
   );
 }
@@ -261,7 +266,9 @@ function TokenListItem({
         <Box mr={1} textAlign="end">
           <ListItemText
             primary={details?.tokenAmount}
-            secondary={`$${details?.tokenAmount * (details?.priceUsdt ?? 0)}`}
+            secondary={`$${(
+              details?.tokenAmount * (details?.priceUsdt ?? 0)
+            )?.toFixed(3)}`}
           />
         </Box>
       )}
