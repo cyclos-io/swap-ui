@@ -10,7 +10,7 @@
     "@project-serum/swap": "^0.1.0-alpha.32",
     "@solana/spl-token": "^0.1.8",
     "@solana/spl-token-registry": "^0.2.275",
-    "usehooks-ts": "^1.0.4"
+    "usehooks-ts": "1.0.4"
   },
   "peerDependencies": {
     "@material-ui/core": "^4.12.3",
