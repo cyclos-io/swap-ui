@@ -301,6 +301,9 @@ export function SwapTokenForm({
               input: styles.input,
             },
           }}
+          inputProps={{
+            min: 0,
+          }}
         />
       </Box>
       <Box className={styles.balanceContainer}>
