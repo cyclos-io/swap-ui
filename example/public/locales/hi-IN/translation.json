@@ -1,0 +1,72 @@
+{
+    "connect_wallet": "वॉलेट कनेक्ट करें",
+    "disconnect": "डिसकनेक्ट",
+    "modal": {
+        "walletStepIntro": {
+            "instruction": "{{appName}} का उपयोग करने के लिए, आपको एक सोलाना वॉलेट कनेक्ट करना होगा।",
+            "detailsOne": {
+                "title": "आप अपने क्रिप्टो को नियंत्रित करते हैं",
+                "description": "गैर-कस्टोडियल वॉलेट का उपयोग करने से आप तीसरे पक्ष पर भरोसा किए बिना अपने क्रिप्टो को नियंत्रित कर सकते हैं।"
+            },
+            "detailsTwo": {
+                "title": "जल्दी और सस्ते में लेन-देन करें",
+                "description": "सोलाना की मापनीयता सुनिश्चित करती है कि लेनदेन $0.01 से कम और बिजली की तेज गति से बने रहें।"
+            }
+        },
+        "walletStepSelect": {
+            "heading": "अपना वॉलेट चुनें",
+            "showUninstalledWallet": "अनइंस्टॉल किए गए वॉलेट दिखाएं",
+            "hideUninstalledWallet": "अनइंस्टॉल किए गए वॉलेट छिपाएं"
+        },
+        "walletStepConnecting": {
+            "connecting": {
+                "header": "कनेक्ट हो रहा है...",
+                "instructions": "कृपया अपना {{walletName}} वॉलेट अनलॉक करें।"
+            },
+            "footer": {
+                "title": "परेशानी हो रही है?"
+            }
+        },
+        "walletStepRedirect": {
+            "title": "आपको रीडायरेक्ट किया जा रहा है",
+            "ix1": "{{infoName}} वॉलेट उपयोग करने के लिए, पहले आपको {{infoName}} वॉलेट इंस्टॉल करना है",
+            "ix2": "सावधान रहे! ध्यान रखे कि आप केवल आधिकारिक वेबसाइट <strong>({{providerURL}})</strong> से इंस्टॉल करें"
+        }
+    },
+    "buttons": {
+        "continue": "आगे बड़े",
+        "goBack": "वापस जाओ",
+        "refresh": "ताज़ा करना"
+    },
+    "footer": {
+        "title": "पहली बार सोलाना का उपयोग कर रहे हैं?",
+        "button": "और अधिक जानें",
+        "finishedInstalling": "हो गया इंस्टॉल?"
+    },
+    "changeLanguage": "भाषा बदलें",
+    "swap": "स्वैप",
+    "trade_route": "ट्रेड रूट",
+    "trade_route_not_found": "ट्रेड रूट मिला नहीं",
+    "tokens": "टोकंस",
+    "select_token": "टोकंस चुनिए",
+    "common_bases": "कॉमन टोकंस",
+    "main": "मैन",
+    "wormhole": "वर्महोल",
+    "sollet": "सोलेट",
+    "price_impact": "प्राइस इम्पैक्ट :",
+    "slippage_tolerance": "स्लीपपागे टॉलरेंस :",
+    "settings": "सेटिंग्स",
+    "fair_price": "फेयर प्राइस",
+    "balance": "बैलेंस",
+    "insufficient_balance": "इन्सुफिसिएंट बैलेंस",
+    "half": "हाफ",
+    "max": "मैक्स",
+    "create_accounts": "क्रिएट एकाउंट्स",
+    "wrap_sol": "व्रैप SOL",
+    "unwrap_sol": "SOL खोलना",
+    "unwrap": "खोलना",
+    "min_amt_req": "कमसे कम {{amount}} चाहिए",
+    "loading": "लोड हो रहा है",
+    "auto": "ऑटो",
+    "key": "{{value, price, EUR}}"
+}

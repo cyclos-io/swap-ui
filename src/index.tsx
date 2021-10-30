@@ -7,7 +7,9 @@ import { Provider } from "@project-serum/anchor";
 import { Swap as SwapClient } from "@project-serum/swap";
 import { TokenListContainer } from "@solana/spl-token-registry";
 import { PublicKey } from "@solana/web3.js";
-import { ReactElement } from "react";
+import { ReactElement, Suspense } from "react";
+import { I18nextProvider } from "react-i18next";
+import { LangOption } from "./utils/types";
 import SwapCard, {
   ArrowButton,
   SwapButton,
@@ -28,6 +30,8 @@ import {
 } from "./context/Swap";
 import { TokenContextProvider, useTokenContext } from "./context/Token";
 import { TokenListContextProvider, useTokenListContext } from "./context/TokenList";
+import I18n from "./i18n";
+import { LanguageToggle } from "./components/LanguageToggle";
 
 /**
  * A`Swap` component that can be embedded into applications. To use,
@@ -60,7 +64,11 @@ export default function Swap(props: SwapProps): ReactElement {
     fromAmount,
     toAmount,
     referral,
+    langOption
   } = props;
+
+  // Remove hindi after testing
+  const l: LangOption = { en: { nativeName: "English" }, "hi-IN": { nativeName: "Hindi" }, "fr": { nativeName: "French" }, ...langOption };
 
   // @ts-ignore
   const swapClient = new SwapClient(provider, tokenList);
@@ -83,33 +91,42 @@ export default function Swap(props: SwapProps): ReactElement {
     }
   );
   return (
-    <ThemeProvider theme={theme}>
-      <TokenContextProvider provider={provider}>
-        <TokenListContextProvider
-          tokenList={tokenList}
-          commonBases={commonBases}
-          provider={provider}
-        >
-          <DexContextProvider swapClient={swapClient}>
-            <SwapContextProvider
-              fromMint={fromMint}
-              toMint={toMint}
-              fromAmount={fromAmount}
-              toAmount={toAmount}
-              referral={referral}
+    <Suspense fallback="loading..">
+      <I18nextProvider i18n={I18n}>
+
+        <ThemeProvider theme={theme}>
+          <TokenContextProvider provider={provider}>
+            <TokenListContextProvider
+              tokenList={tokenList}
+              commonBases={commonBases}
+              provider={provider}
             >
-              <SwapCard
-                containerStyle={containerStyle}
-                contentStyle={contentStyle}
-                swapTokenContainerStyle={swapTokenContainerStyle}
-                swapButtonStyle={swapButtonStyle}
-                connectWalletCallback={connectWalletCallback}
-              />
-            </SwapContextProvider>
-          </DexContextProvider>
-        </TokenListContextProvider>
-      </TokenContextProvider>
-    </ThemeProvider>
+              <DexContextProvider swapClient={swapClient}>
+                <SwapContextProvider
+                  fromMint={fromMint}
+                  toMint={toMint}
+                  fromAmount={fromAmount}
+                  toAmount={toAmount}
+                  referral={referral}
+                >
+                  <SwapCard
+                    containerStyle={containerStyle}
+                    contentStyle={contentStyle}
+                    swapTokenContainerStyle={swapTokenContainerStyle}
+                    swapButtonStyle={swapButtonStyle}
+                    connectWalletCallback={connectWalletCallback}
+                  />
+                  {/*  This is not required. 
+                  Language will be automatically read from the browser. 
+                  For testing only */}
+                  <LanguageToggle langOption={l} />
+                </SwapContextProvider>
+              </DexContextProvider>
+            </TokenListContextProvider>
+          </TokenContextProvider>
+        </ThemeProvider>
+      </I18nextProvider>
+    </Suspense>
   );
 }
 
@@ -190,6 +207,10 @@ export type SwapProps = {
    * Callback for wallet connection
    */
   connectWalletCallback?: any;
+  /**
+   * Pass language options for i18n
+   */
+  langOption?: LangOption;
 };
 
 export {

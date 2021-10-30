@@ -27,6 +27,7 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   FEE_MULTIPLIER,
   useDexContext,
@@ -177,6 +178,9 @@ export default function SwapCard({
 }
 
 export function SwapHeader() {
+
+  const { t } = useTranslation();
+
   return (
     <div
       style={{
@@ -191,7 +195,7 @@ export function SwapHeader() {
           fontWeight: 700,
         }}
       >
-        SWAP
+        {t('swap', "SWAP")}
       </Typography>
       <InfoButton />
     </div>
@@ -263,16 +267,18 @@ export function SwapTokenForm({
   const tokenAccount = useOwnedTokenAccount(mint);
   const tokenInfo = useTokenInfo(mint);
   const mintDecimals = tokenInfo?.decimals;
+  const { t, i18n } = useTranslation();
 
   const balance = tokenAccount && mintDecimals && tokenAccount.tokenAmount;
 
   const formattedAmount =
     mintDecimals && amount
-      ? amount.toLocaleString("fullwide", {
+      ? amount.toLocaleString(i18n.language, {
           maximumFractionDigits: mintDecimals,
           useGrouping: false,
         })
       : amount;
+  console.log(formattedAmount)
 
   const tokenDialog = useMemo(() => {
     return (
@@ -293,16 +299,19 @@ export function SwapTokenForm({
         <TextField
           type="number"
           value={formattedAmount}
-          onChange={(e) => setAmount(parseFloat(e.target.value))}
+          lang={i18n.language}
+          onChange={(e) => setAmount(parseFloat((e.target.value)))}
           InputProps={{
             disableUnderline: true,
             classes: {
               root: styles.amountInput,
               input: styles.input,
             },
+            lang:i18n.language
           }}
           inputProps={{
             min: 0,
+            lang:i18n.language
           }}
         />
       </Box>
@@ -310,7 +319,7 @@ export function SwapTokenForm({
         {tokenAccount && mintDecimals ? (
           <Box>
             <Typography variant="caption">
-              <small>Balance:&nbsp;</small>
+              <small>{t('balance', "Balance")}:&nbsp;</small>
             </Typography>
             {balance?.toFixed(mintDecimals)}
           </Box>
@@ -325,7 +334,7 @@ export function SwapTokenForm({
               className={styles.maxButton}
               onClick={() => setAmount(balance / 2)}
             >
-              Half
+              {t('half', "Half")}
             </Button>
             <Button
               variant="text"
@@ -333,7 +342,7 @@ export function SwapTokenForm({
               className={styles.maxButton}
               onClick={() => setAmount(balance)}
             >
-              Max
+              {t('max', "Max")}
             </Button>
           </div>
         )}
@@ -407,6 +416,7 @@ export function SwapButton({
   connectWalletCallback?: any;
 }) {
   const styles = useStyles();
+  const { t } = useTranslation();
   const {
     fromMint,
     toMint,
@@ -835,7 +845,7 @@ export function SwapButton({
         disabled={!connectWalletCallback}
         style={swapButtonStyle}
       >
-        {!!connectWalletCallback ? "Connect Wallet" : "Disconnected"}
+        {!!connectWalletCallback ? t('connect_wallet', "Connect Wallet") : t('disconnect', "Disconnect")}
       </Button>
     );
   }
@@ -848,7 +858,7 @@ export function SwapButton({
         disabled={true}
         style={swapButtonStyle}
       >
-        Loading...
+        {t('loading', "Loading...")}
       </Button>
     );
   }
@@ -860,7 +870,7 @@ export function SwapButton({
       style={swapButtonStyle}
       disabled={true}
     >
-      Insufficient balance
+      {t('insufficient_balance', "Insufficient balance")}
     </Button>
   ) : needsCreateAccounts ? (
     <Button
@@ -870,7 +880,7 @@ export function SwapButton({
       disabled={!canCreateAccounts}
       style={swapButtonStyle}
     >
-      Create Accounts
+      {t('create_accounts', "Create Accounts")}
     </Button>
   ) : isWrapSol ? (
     <Button
@@ -880,7 +890,7 @@ export function SwapButton({
       onClick={sendWrapSolTransaction}
       disabled={!canWrapOrUnwrap}
     >
-      Wrap SOL
+      {t('wrap_sol', "Wrap SOL")}
     </Button>
   ) : isUnwrapSol ? (
     <Button
@@ -890,7 +900,7 @@ export function SwapButton({
       style={swapButtonStyle}
       disabled={!canWrapOrUnwrap}
     >
-      Unwrap SOL
+      {t('unwrap_sol', "Unwrap SOL")}
     </Button>
   ) : isUnwrapSollet ? (
     <Button
@@ -900,7 +910,7 @@ export function SwapButton({
       disabled={fromAmount <= 0}
       style={swapButtonStyle}
     >
-      Unwrap
+      {t('unwrap', "Unwrap")}
     </Button>
   ) : minSwapAmount ? (
     <Button
@@ -910,7 +920,7 @@ export function SwapButton({
       disabled={true}
       style={swapButtonStyle}
     >
-      Min {minSwapAmount} Required
+      {t('min_amt_req', "Min {{amount}} Required", { amount: minSwapAmount })}
     </Button>
   ) : (
     <Button
@@ -920,7 +930,7 @@ export function SwapButton({
       disabled={!canSwap}
       style={swapButtonStyle}
     >
-      Swap
+      {t('swap', "Swap")}
     </Button>
   );
 }

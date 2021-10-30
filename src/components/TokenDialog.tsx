@@ -27,6 +27,7 @@ import { CloseRounded, Star, StarOutline } from "@material-ui/icons";
 import { TokenInfo } from "@solana/spl-token-registry";
 import { PublicKey } from "@solana/web3.js";
 import { forwardRef, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useOwnedTokenAccount, useTokenContext } from "../context/Token";
 import {
   useSwappableTokens,
@@ -100,23 +101,24 @@ export default function TokenDialog({
   const { swappableTokens, swappableTokensSollet, swappableTokensWormhole } =
     useSwappableTokens();
   const { tokenBase, addNewBase, tokenBaseMap, removeBase } = useTokenBase();
+  const { t } = useTranslation();
 
   const selectedTokens =
     tabSelection === 0
       ? swappableTokens
       : tabSelection === 1
-      ? swappableTokensWormhole
-      : swappableTokensSollet;
+        ? swappableTokensWormhole
+        : swappableTokensSollet;
 
   let tokens =
     tokenFilter === ""
       ? selectedTokens
       : selectedTokens.filter(
-          (t) =>
-            t.symbol.toLowerCase().startsWith(filter) ||
-            t.name.toLowerCase().startsWith(filter) ||
-            t.address.toLowerCase().startsWith(filter)
-        );
+        (t) =>
+          t.symbol.toLowerCase().startsWith(filter) ||
+          t.name.toLowerCase().startsWith(filter) ||
+          t.address.toLowerCase().startsWith(filter)
+      );
   return (
     <Dialog
       open={open}
@@ -139,7 +141,7 @@ export default function TokenDialog({
           alignItems="center"
           className={styles.selectTokenTitle}
         >
-          <Typography variant="h6">Select a token</Typography>
+          <Typography variant="h6">{t('select_token', "Select a token")}</Typography>
           <IconButton size="small" onClick={onClose}>
             <CloseRounded />
           </IconButton>
@@ -156,7 +158,7 @@ export default function TokenDialog({
           onChange={(e) => setTokenFilter(e.target.value)}
         />
 
-        <Typography variant="caption">Common bases</Typography>
+        <Typography variant="caption">{t('common_bases', "Common bases")}</Typography>
         {/* Common token */}
         {tokenBase?.length != 0 && (
           <CommonBases
@@ -201,7 +203,7 @@ export default function TokenDialog({
             color="primary"
             onClick={() => setTabSelection(0)}
           >
-            Main
+            {t('main', "Main")}
           </Button>
           <Button
             fullWidth
@@ -210,7 +212,7 @@ export default function TokenDialog({
             color="primary"
             onClick={() => setTabSelection(1)}
           >
-            Wormhole
+            {t('wormhole', "Wormhole")}
           </Button>
           <Button
             fullWidth
@@ -219,7 +221,7 @@ export default function TokenDialog({
             color="primary"
             onClick={() => setTabSelection(2)}
           >
-            Sollet
+            {t('sollet', "Sollet")}
           </Button>
         </Box>
       </DialogActions>

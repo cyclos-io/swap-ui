@@ -10,6 +10,7 @@ import {
   useTheme,
 } from "@material-ui/core";
 import { InfoOutlined, SwapHorizRounded } from "@material-ui/icons";
+import { useTranslation } from "react-i18next";
 import { PublicKey } from "@solana/web3.js";
 import PopupState, { bindPopover, bindTrigger } from "material-ui-popup-state";
 import {
@@ -40,6 +41,7 @@ const useStyles = makeStyles((theme: Theme) => ({
 
 export function InfoLabel() {
   const styles = useStyles();
+  const { t } = useTranslation();
 
   const {
     slippage,
@@ -89,9 +91,8 @@ export function InfoLabel() {
         >
           {fair !== undefined && toTokenInfo && fromTokenInfo
             ? showReversePrices
-              ? `${(1 / fair).toFixed(toTokenInfo.decimals)} ${
-                  toTokenInfo.symbol
-                }`
+              ? `${(1 / fair).toFixed(toTokenInfo.decimals)} ${toTokenInfo.symbol
+              }`
               : `${fair.toFixed(fromTokenInfo.decimals)} ${
                   fromTokenInfo.symbol
                 }`
@@ -101,7 +102,7 @@ export function InfoLabel() {
       <Divider />
       <div className={styles.infoLabel}>
         <Typography color="textSecondary" style={{ fontSize: "14px" }}>
-          Price Impact:&nbsp;
+          {t('price_impact', "Price Impact:")}&nbsp;
         </Typography>
         <Typography
           style={{ fontSize: "14px", fontWeight: 500 }}
@@ -115,7 +116,7 @@ export function InfoLabel() {
       <div className={styles.infoLabel}>
         <Box display="flex" alignItems="center">
           <Typography color="textSecondary" style={{ fontSize: "14px" }}>
-            Slippage Tolerance:&nbsp;
+            {t('slippage_tolerance', "Slippage Tolerance:")}&nbsp;
           </Typography>
           <SettingsButton />
         </Box>
@@ -174,6 +175,8 @@ export function InfoButton() {
 function InfoDetails() {
   // Use last route item to find impact
   const { route } = useDexContext();
+  const { t } = useTranslation();
+
   const routeMarkets = route?.markets;
 
   const { fromMint, toMint } = useSwapContext();
@@ -192,14 +195,14 @@ function InfoDetails() {
           color="textSecondary"
           style={{ fontWeight: "bold", marginBottom: "5px" }}
         >
-          Trade Route
+          {t('trade_route', "Trade Route")}
         </Typography>
         {routeMarkets ? (
           routeMarkets.map((market: PublicKey) => {
             return <MarketRoute key={market.toString()} market={market} />;
           })
         ) : (
-          <Typography color="textSecondary">Route not found</Typography>
+          <Typography color="textSecondary">{t('trade_route_not_found', "Route not found")}</Typography>
         )}
       </div>
       <div style={{ marginTop: "15px" }}>
@@ -207,7 +210,7 @@ function InfoDetails() {
           color="textSecondary"
           style={{ fontWeight: "bold", marginBottom: "5px" }}
         >
-          Tokens
+          {(t('tokens', "Tokens"))}
         </Typography>
         {addresses.map((address) => {
           return (

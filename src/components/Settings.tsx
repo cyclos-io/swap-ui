@@ -13,6 +13,7 @@ import {
 import { SettingsOutlined as Settings } from "@material-ui/icons";
 import PopupState, { bindPopover, bindTrigger } from "material-ui-popup-state";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useDexContext } from "../context/Dex";
 import { useSwapContext, useSwapFair } from "../context/Swap";
 
@@ -94,6 +95,7 @@ export function SettingsButton() {
 
 function SettingsDetails() {
   const styles = useStyles();
+  const { t } = useTranslation();
 
   const { slippage, setSlippage, fairOverride, setFairOverride } =
     useSwapContext();
@@ -106,11 +108,11 @@ function SettingsDetails() {
 
   return (
     <div style={{ padding: "15px", width: "305px" }}>
-      <Typography style={{ fontWeight: "bold" }}>Settings</Typography>
+      <Typography style={{ fontWeight: "bold" }}>{t('settings', "Settings")}</Typography>
       <div>
         <div style={{ marginTop: "10px" }}>
           <Typography color="textSecondary" style={{ fontSize: "12px" }}>
-            Slippage tolerance
+            {t('slippage_tolerance', "Slippage tolerance")}
           </Typography>
           <TextField
             type="number"
@@ -129,7 +131,7 @@ function SettingsDetails() {
         </div>
         <div style={{ marginTop: "10px" }}>
           <Typography color="textSecondary" style={{ fontSize: "12px" }}>
-            Fair price
+            {t('fair_price', "Fair price")}
           </Typography>
           <div style={{ display: "flex" }}>
             <TextField
@@ -166,7 +168,7 @@ function SettingsDetails() {
                   : styles.fairAuto
               }
             >
-              Auto
+              {t('auto', "Auto")}
             </Button>
           </div>
         </div>
