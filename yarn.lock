@@ -1696,10 +1696,10 @@
     bs58 "^4.0.1"
     eventemitter3 "^4.0.7"
 
-"@project-serum/swap@^0.1.0-alpha.32":
-  version "0.1.0-alpha.32"
-  resolved "https://registry.npmjs.org/@project-serum/swap/-/swap-0.1.0-alpha.32.tgz"
-  integrity sha512-zA61f8OrZfWeR056l9nUG+lO17M9Tf3ePaFJsfGXcExQ6bV4JjIKWr8gnyLv4xyPDZJKKXhCrHVaK0ipBE4s+g==
+"@project-serum/swap@^0.1.0-alpha.34":
+  version "0.1.0-alpha.34"
+  resolved "https://registry.yarnpkg.com/@project-serum/swap/-/swap-0.1.0-alpha.34.tgz#bb4e6311fd56880b8c35270487c2712e29b2da3f"
+  integrity sha512-YiJT98/C7hcdqzYgQJqc+CWrqO8vzDsJ6TzfN0Liqg1tN3G9vu1hB++I6nwkNMC4lHshry2kIf6sVZfBJMw0lA==
   dependencies:
     "@project-serum/serum" "^0.13.34"
     "@solana/spl-token" "^0.1.6"
@@ -1764,10 +1764,10 @@
   dependencies:
     cross-fetch "3.0.6"
 
-"@solana/spl-token-registry@^0.2.275":
-  version "0.2.275"
-  resolved "https://registry.yarnpkg.com/@solana/spl-token-registry/-/spl-token-registry-0.2.275.tgz#239e7948fde26aaa45a75ac05b51ce52b9e929a5"
-  integrity sha512-wAH26iJ7dQLs+Ma75ueYYeO1FtWvYlb8sM0SXuviy+q1PhrBto8sgXGuBGcku7LpdnDnPdy8FM5BplNOAI3Fcw==
+"@solana/spl-token-registry@^0.2.68":
+  version "0.2.368"
+  resolved "https://registry.yarnpkg.com/@solana/spl-token-registry/-/spl-token-registry-0.2.368.tgz#0e7c45d8700b19a0d705629083166d945c3a0791"
+  integrity sha512-xREpVh4PS4MHUCblcwM9ekxqUWTcrH540aZ/1/Gjp1K37OTOcrM+Qe7nrWPXIKuhesSC84uugaiu2tOZ7t/JCA==
   dependencies:
     cross-fetch "3.0.6"
 
