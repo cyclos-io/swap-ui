@@ -72,9 +72,7 @@ const useStyles = makeStyles((theme) => ({
   },
   swapButton: {
     width: "100%",
-    borderRadius: theme.spacing(2),
-    backgroundColor: theme.palette.primary.main,
-    color: theme.palette.primary.contrastText,
+    borderRadius: theme.spacing(1),
     fontSize: 16,
     fontWeight: 700,
     padding: theme.spacing(1.5),
@@ -834,6 +832,7 @@ export function SwapButton({
         onClick={connectWalletCallback}
         disabled={!connectWalletCallback}
         style={swapButtonStyle}
+        color="secondary"
       >
         {!!connectWalletCallback ? "Connect Wallet" : "Disconnected"}
       </Button>
@@ -847,6 +846,7 @@ export function SwapButton({
         onClick={sendSwapTransaction}
         disabled={true}
         style={swapButtonStyle}
+        color="secondary"
       >
         Loading...
       </Button>
@@ -857,6 +857,7 @@ export function SwapButton({
     <Button
       variant="contained"
       className={styles.swapButton}
+      color="secondary"
       style={swapButtonStyle}
       disabled={true}
     >
@@ -868,6 +869,7 @@ export function SwapButton({
       className={styles.swapButton}
       onClick={sendCreateAccountsTransaction}
       disabled={!canCreateAccounts}
+      color="secondary"
       style={swapButtonStyle}
     >
       Create Accounts
@@ -876,6 +878,7 @@ export function SwapButton({
     <Button
       variant="contained"
       className={styles.swapButton}
+      color="secondary"
       style={swapButtonStyle}
       onClick={sendWrapSolTransaction}
       disabled={!canWrapOrUnwrap}
@@ -887,6 +890,7 @@ export function SwapButton({
       variant="contained"
       className={styles.swapButton}
       onClick={sendUnwrapSolTransaction}
+      color="secondary"
       style={swapButtonStyle}
       disabled={!canWrapOrUnwrap}
     >
@@ -898,6 +902,7 @@ export function SwapButton({
       className={styles.swapButton}
       onClick={sendUnwrapSolletTransaction}
       disabled={fromAmount <= 0}
+      color="secondary"
       style={swapButtonStyle}
     >
       Unwrap
@@ -908,6 +913,7 @@ export function SwapButton({
       className={styles.swapButton}
       onClick={sendSwapTransaction}
       disabled={true}
+      color="secondary"
       style={swapButtonStyle}
     >
       Min {minSwapAmount} Required
@@ -918,6 +924,7 @@ export function SwapButton({
       className={styles.swapButton}
       onClick={sendSwapTransaction}
       disabled={!canSwap}
+      color="secondary"
       style={swapButtonStyle}
     >
       Swap
